@@ -94,7 +94,8 @@ bx_gui_c::init(int argc, char **argv, unsigned tilewidth, unsigned tileheight)
                           BX_GRAVITY_LEFT, floppyB_handler);
 
   // Mouse button
-  if (bx_options.mouse_enabled)
+  BX_GUI_THIS mouse_status = gui_get_mouse_enable();
+  if (BX_GUI_THIS mouse_status)
     BX_GUI_THIS mouse_hbar_id = headerbar_bitmap(BX_GUI_THIS mouse_bmap_id,
                           BX_GRAVITY_LEFT, mouse_handler);
   else
@@ -157,16 +158,13 @@ bx_gui_c::floppyB_handler(void)
   void
 bx_gui_c::reset_handler(void)
 {
-  BX_INFO(( "system RESET callback." ));
-  bx_pc_system.ResetSignal( PCS_SET ); /* XXX is this right? */
-  for (int i=0; i<BX_SMP_PROCESSORS; i++)
-      BX_CPU(i)->reset(BX_RESET_HARDWARE);
+  BX_PANIC(( "RESET button was pressed.\n" ));
 }
 
   void
 bx_gui_c::power_handler(void)
 {
-  BX_PANIC(("POWER button turned off."));
+  BX_PANIC(("POWER button turned off.\n"));
   // exit the simulator even if panic did not actually quit.
   ::exit (1);
 }
@@ -174,18 +172,20 @@ bx_gui_c::power_handler(void)
   void
 bx_gui_c::snapshot_handler(void)
 {
-#if BX_USE_CONTROL_PANEL
-  bx_control_panel (BX_CPANEL_RUNTIME);
-#else
-  BX_INFO(( "# SNAPSHOT callback (unimplemented)." ));
-#endif
+  BX_INFO(( "# SNAPSHOT callback (unimplemented).\n" ));
 }
 
   void
 bx_gui_c::mouse_handler(void)
 {
-  int old = gui_get_mouse_enable ();
-  gui_set_mouse_enable (!old);
+  BX_GUI_THIS mouse_status = ! BX_GUI_THIS mouse_status;
+
+  if (BX_GUI_THIS mouse_status)
+    replace_bitmap(BX_GUI_THIS mouse_hbar_id, BX_GUI_THIS mouse_bmap_id);
+  else
+    replace_bitmap(BX_GUI_THIS mouse_hbar_id, BX_GUI_THIS nomouse_bmap_id);
+
+  gui_set_mouse_enable(BX_GUI_THIS mouse_status);
 }
 
   Boolean
@@ -198,11 +198,6 @@ bx_gui_c::gui_get_mouse_enable(void)
 bx_gui_c::gui_set_mouse_enable(Boolean val)
 {
   bx_options.mouse_enabled = val;
-  BX_DEBUG (("maybe this should happen only if window has been created"));
-  if (bx_options.mouse_enabled)
-    replace_bitmap(BX_GUI_THIS mouse_hbar_id, BX_GUI_THIS mouse_bmap_id);
-  else
-    replace_bitmap(BX_GUI_THIS mouse_hbar_id, BX_GUI_THIS nomouse_bmap_id);
 }
 
 void 

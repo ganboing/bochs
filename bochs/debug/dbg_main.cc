@@ -278,7 +278,7 @@ bx_dbg_main(int argc, char *argv[])
   i = 1;
   if ( (argc >= 2) && !strcmp(argv[1], "-rc") ) {
     if ( argc == 2 ) {
-      BX_ERROR(( "%s: -rc option used, but no path specified.",
+      BX_ERROR(( "%s: -rc option used, but no path specified.\n",
         argv[0] ));
       bx_dbg_usage();
       exit(1);
@@ -332,10 +332,10 @@ process_sim2:
 
 
   if (bx_debug_rc_fname[0] == '\0') {
-    BX_INFO(("Warning: no rc file specified.", argv[0]));
+    BX_INFO(("Warning: no rc file specified.\n", argv[0]));
     }
   else {
-    BX_INFO (("%s: using rc file '%s'.", argv[0], bx_debug_rc_fname));
+    BX_INFO (("%s: using rc file '%s'.\n", argv[0], bx_debug_rc_fname));
     // if there's an error, the user will know about it before proceeding
     (void) bx_nest_infile(bx_debug_rc_fname);
     }
@@ -607,7 +607,7 @@ bxerror(char *s)
 bx_debug_ctrlc_handler(int signum)
 {
   UNUSED(signum);
-  BX_INFO(("Ctrl-C detected in signal handler."));
+  BX_INFO(("Ctrl-C detected in signal handler.\n"));
 
   signal(SIGINT, bx_debug_ctrlc_handler);
   bx_guard.interrupt_requested = 1;
@@ -616,7 +616,7 @@ bx_debug_ctrlc_handler(int signum)
   void
 bx_dbg_exit(int code)
 {
-  BX_DEBUG(( "dbg: before sim1_exit" ));
+  BX_DEBUG(( "dbg: before sim1_exit\n" ));
   for (int cpu=0; cpu < BX_SMP_PROCESSORS; cpu++) {
     if (BX_CPU(cpu)) BX_CPU(cpu)->atexit();
   }
@@ -639,7 +639,7 @@ bx_dbg_exit(int code)
   void
 bx_dbg_quit_command(void)
 {
-  BX_INFO(("dbg: Quit"));
+  BX_INFO(("dbg: Quit\n"));
   bx_dbg_exit(0);
 }
 
@@ -1130,9 +1130,6 @@ void bx_dbg_show_command(char* arg)
 		    /* bx_dbg.record_io = 0; this is a pointer .. somewhere */
 		    printf("Turned off all bx_dbg flags\n");
 		    return;
-	    } else if(!strcmp(arg,"\"vga\"")){
-	      bx_vga.timer ();
-	      return;
 	    } else {
 		  printf("Unrecognized arg: %s ('mode' 'int' 'call' 'ret' 'dbg-all' are valid)\n",arg);
 		  return;
@@ -1509,7 +1506,7 @@ bx_dbg_continue_command(void)
 			if (found & BX_DBG_GUARD_ICOUNT) {
 				// I expected this guard, don't stop
 			} else if (found!=0) {
-				BX_INFO(("found guard other than icount in %s..stopping", BX_CPU(cpu)->name));
+				BX_INFO(("found guard other than icount in %s..stopping\n", BX_CPU(cpu)->name));
 				stop = 1;
 				which = cpu;
 			} else if (reason != STOP_NO_REASON && reason != STOP_CPU_HALTED) {
@@ -1556,10 +1553,10 @@ bx_dbg_stepN_command(bx_dbg_icount_t count)
   bx_guard.guard_for |= BX_DBG_GUARD_ICOUNT; // looking for icount
   bx_guard.guard_for |= BX_DBG_GUARD_CTRL_C; // or Ctrl-C
 	// for now, step each CPU one BX_DBG_DEFAULT_ICOUNT_QUANTUM at a time
-  //BX_INFO(("Stepping each CPU a total of %d cycles", count));
+  //BX_INFO(("Stepping each CPU a total of %d cycles\n", count));
 	for (unsigned cycle=0; cycle < count; cycle++) {
 		for (unsigned cpu=0; cpu < BX_SMP_PROCESSORS; cpu++) {
-		  //BX_INFO(("Stepping %s", BX_CPU(cpu)->name));
+		  //BX_INFO(("Stepping %s\n", BX_CPU(cpu)->name));
 			bx_guard.icount = 1;
       bx_guard.interrupt_requested = 0;
 			BX_CPU(cpu)->guard_found.guard_found = 0;
@@ -1568,7 +1565,7 @@ bx_dbg_stepN_command(bx_dbg_icount_t count)
 		}
 		BX_TICK1 ();
 	}
-  //BX_INFO(("Stepped each CPU a total of %d cycles", count));
+  //BX_INFO(("Stepped each CPU a total of %d cycles\n", count));
 #endif
 
   BX_INSTR_DEBUG_PROMPT();
@@ -3131,7 +3128,7 @@ bx_dbg_disassemble_command(bx_num_range range)
 
   if (range.to == EMPTY_ARG) {
     // should set to cs:eip. FIXME
-    BX_INFO(("Error: type 'disassemble ADDR' or 'disassemble ADDR:ADDR'"));
+    BX_INFO(("Error: type 'disassemble ADDR' or 'disassemble ADDR:ADDR'\n"));
     return;
   }
 
