@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: x.cc,v 1.57 2002-12-30 13:17:39 vruppert Exp $
+// $Id: x.cc,v 1.55.2.1 2003-01-03 00:29:34 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -41,11 +41,9 @@ extern "C" {
 #include <X11/Xos.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
-#include <X11/xpm.h>
 }
 
-//#include "icon_bochs.h"
-#include "icon_bochs.xpm"
+#include "icon_bochs.h"
 
 class bx_x_gui_c : public bx_gui_c {
 public:
@@ -333,7 +331,7 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   char *window_name = "Bochs Pentium emulator, http://bochs.sourceforge.net/";
 #endif
   char *icon_name = "Bochs";
-  Pixmap icon_pixmap, icon_mask;
+  Pixmap icon_pixmap;
   XSizeHints size_hints;
   char *display_name = NULL;
   /* create GC for text and drawing */
@@ -461,10 +459,8 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   /* Get available icon sizes from Window manager */
 
   /* Create pixmap of depth 1 (bitmap) for icon */
-/*  icon_pixmap = XCreateBitmapFromData(bx_x_display, win,
-    (char *) bochs_icon_bits, bochs_icon_width, bochs_icon_height);*/
-  /* Create pixmap from XPM for icon */
-  XCreatePixmapFromData(bx_x_display, win, icon_bochs_xpm, &icon_pixmap, &icon_mask, NULL);
+  icon_pixmap = XCreateBitmapFromData(bx_x_display, win,
+    (char *) bochs_icon_bits, bochs_icon_width, bochs_icon_height);
 
   /* Set size hints for window manager.  The window manager may
    * override these settings.  Note that in a real
@@ -503,8 +499,7 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   wm_hints.initial_state = NormalState;
   wm_hints.input = True;
   wm_hints.icon_pixmap = icon_pixmap;
-  wm_hints.icon_mask = icon_mask;
-  wm_hints.flags = StateHint | IconPixmapHint | IconMaskHint | InputHint;
+  wm_hints.flags = StateHint | IconPixmapHint | InputHint;
 
   class_hints.res_name = progname;
   class_hints.res_class = "Bochs";

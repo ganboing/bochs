@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: keyboard.cc,v 1.73 2002-12-26 22:19:44 vruppert Exp $
+// $Id: keyboard.cc,v 1.72.2.1 2003-01-03 00:33:50 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -125,7 +125,7 @@ bx_keyb_c::resetinternals(bx_bool powerup)
   void
 bx_keyb_c::init(void)
 {
-  BX_DEBUG(("Init $Id: keyboard.cc,v 1.73 2002-12-26 22:19:44 vruppert Exp $"));
+  BX_DEBUG(("Init $Id: keyboard.cc,v 1.72.2.1 2003-01-03 00:33:50 cbothamy Exp $"));
   Bit32u   i;
 
   DEV_register_irq(1, "8042 Keyboard controller");

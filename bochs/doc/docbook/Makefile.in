@@ -1,6 +1,6 @@
 ###################################################################
 # doc/docbook/Makefile
-# $Id: Makefile.in,v 1.13 2002-12-25 10:07:42 vruppert Exp $
+# $Id: Makefile.in,v 1.12.2.1 2003-01-01 22:47:04 cbothamy Exp $
 #
 # Builds documentation in various formats from SGML source, and
 # allows easy update to the Bochs web site.

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////
-// $Id: wxmain.cc,v 1.87 2002-12-30 17:04:43 vruppert Exp $
+// $Id: wxmain.cc,v 1.85 2002-12-12 16:52:21 bdenney Exp $
 /////////////////////////////////////////////////////////////////
 //
 // wxmain.cc implements the wxWindows frame, toolbar, menus, and dialogs.
@@ -75,9 +75,6 @@
 #include "bitmaps/mouse.xpm"
 //#include "bitmaps/configbutton.xpm"
 #include "bitmaps/userbutton.xpm"
-#ifdef __WXGTK__
-#include "icon_bochs.xpm"
-#endif
 
 // FIXME: ugly global variables that the bx_gui_c object in wx.cc can use
 // to access the MyFrame and the MyPanel.
@@ -403,8 +400,6 @@ END_EVENT_TABLE()
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size, const long style)
 : wxFrame((wxFrame *)NULL, -1, title, pos, size, style)
 {
-  SetIcon(wxICON(icon_bochs));
-
   // init variables
   sim_thread = NULL;
   start_bochs_times = 0;
@@ -1010,17 +1005,10 @@ void MyFrame::simStatusChanged (StatusChange change, bx_bool popupNotify) {
 #ifdef __GNUC__
 #warning For now, leave ATA devices so that you configure them during runtime. Otherwise you cannot change the CD image at runtime.
 #endif
-  // only enabled ATA channels with a cdrom connected are available at runtime
-  for (unsigned i=0; i<4; i++) {
-    if (!SIM->get_param_bool((bx_id)(BXP_ATA0_PRESENT+i))->get ()) {
-      menuEdit->Enable (ID_Edit_ATA0+i, canConfigure);
-    } else {
-      if ( (SIM->get_param_num((bx_id)(BXP_ATA0_MASTER_TYPE+i*2))->get () != BX_ATA_DEVICE_CDROM) &&
-           (SIM->get_param_num((bx_id)(BXP_ATA0_SLAVE_TYPE+i*2))->get () != BX_ATA_DEVICE_CDROM) ) {
-        menuEdit->Enable (ID_Edit_ATA0+i, canConfigure);
-      }
-    }
-  }
+  //menuEdit->Enable (ID_Edit_ATA0, canConfigure);
+  //menuEdit->Enable (ID_Edit_ATA1, canConfigure);
+  //menuEdit->Enable (ID_Edit_ATA2, canConfigure);
+  //menuEdit->Enable (ID_Edit_ATA3, canConfigure);
   menuEdit->Enable( ID_Edit_Boot, canConfigure);
   menuEdit->Enable( ID_Edit_Memory, canConfigure);
   menuEdit->Enable( ID_Edit_Speed, canConfigure);

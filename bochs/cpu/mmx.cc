@@ -116,24 +116,25 @@ void BX_CPU_C::PUNPCKLBW_PqQd(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn()), op2, result;
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn()), result;
+  Bit32u op2;
 
   /* op2 is a register or memory reference */
   if (i->modC0()) {
-    op2 = BX_READ_MMX_REG(i->rm()); 
+    op2 = BX_READ_32BIT_REG(i->rm());
   }
   else {
     /* pointer, segment address pair */
-    read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
+    read_virtual_dword(i->seg(), RMAddr(i), &op2);
   }
 
-  MMXUB7(result) = MMXUB3(op2);
+  MMXUB7(result) = (op2) >> 24;
   MMXUB6(result) = MMXUB3(op1);
-  MMXUB5(result) = MMXUB2(op2);
+  MMXUB5(result) = (op2 & 0x00ff0000) >> 16;
   MMXUB4(result) = MMXUB2(op1);
-  MMXUB3(result) = MMXUB1(op2);
+  MMXUB3(result) = (op2 & 0x0000ff00) >>  8;
   MMXUB2(result) = MMXUB1(op1);
-  MMXUB1(result) = MMXUB0(op2);
+  MMXUB1(result) = (op2 & 0x000000ff);
   MMXUB0(result) = MMXUB0(op1);
 
   /* now write result back to destination */
@@ -150,20 +151,21 @@ void BX_CPU_C::PUNPCKLWD_PqQd(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn()), op2, result;
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn()), result;
+  Bit32u op2;
 
   /* op2 is a register or memory reference */
   if (i->modC0()) {
-    op2 = BX_READ_MMX_REG(i->rm()); 
+    op2 = BX_READ_32BIT_REG(i->rm());
   }
   else {
     /* pointer, segment address pair */
-    read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
+    read_virtual_dword(i->seg(), RMAddr(i), &op2);
   }
 
-  MMXUW3(result) = MMXUW1(op2);
+  MMXUW3(result) = (op2) >> 16;
   MMXUW2(result) = MMXUW1(op1);
-  MMXUW1(result) = MMXUW0(op2);
+  MMXUW1(result) = (op2 & 0x0000ffff);
   MMXUW0(result) = MMXUW0(op1);
 
   /* now write result back to destination */
@@ -180,18 +182,19 @@ void BX_CPU_C::PUNPCKLDQ_PqQd(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn()), op2;
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->nnn());
+  Bit32u op2;
 
   /* op2 is a register or memory reference */
   if (i->modC0()) {
-    op2 = BX_READ_MMX_REG(i->rm()); 
+    op2 = BX_READ_32BIT_REG(i->rm());
   }
   else {
     /* pointer, segment address pair */
-    read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
+    read_virtual_dword(i->seg(), RMAddr(i), &op2);
   }
 
-  MMXUD1(op1) = MMXUD0(op2);
+  MMXUD1(op1) = op2;
 
   /* now write result back to destination */
   BX_WRITE_MMX_REG(i->nnn(), op1);
@@ -1276,11 +1279,6 @@ void BX_CPU_C::PSRAW_PqQq(bxInstruction_c *i)
     read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
   }
 
-  if(!MMXUQ(op2)) {
-    BX_WRITE_MMX_REG(i->nnn(), op1);
-    return;
-  }
-
   Bit8u shift = MMXUB0(op2);
 
   if(MMXUQ(op2) > 15) {
@@ -1324,11 +1322,6 @@ void BX_CPU_C::PSRAD_PqQq(bxInstruction_c *i)
   else {
     /* pointer, segment address pair */
     read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
-  }
-
-  if(!MMXUQ(op2)) {
-    BX_WRITE_MMX_REG(i->nnn(), op1);
-    return;
   }
 
   Bit8u shift = MMXUB0(op2);
@@ -2059,6 +2052,7 @@ void BX_CPU_C::PADDB_PqQq(bxInstruction_c *i)
     read_virtual_qword(i->seg(), RMAddr(i), (Bit64u *) &op2);
   }
 
+
   MMXUB0(op1) += MMXUB0(op2);
   MMXUB1(op1) += MMXUB1(op2);
   MMXUB2(op1) += MMXUB2(op2);
@@ -2140,20 +2134,20 @@ void BX_CPU_C::PSRLW_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
-  if(shift > 15) MMXUQ(op) = 0;
+  if(shift > 15) MMXUQ(op1) = 0;
   else
   {
-    MMXUW0(op) >>= shift;
-    MMXUW1(op) >>= shift;
-    MMXUW2(op) >>= shift;
-    MMXUW3(op) >>= shift;
+    MMXUW0(op1) >>= shift;
+    MMXUW1(op1) >>= shift;
+    MMXUW2(op1) >>= shift;
+    MMXUW3(op1) >>= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSRLW_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);
@@ -2166,30 +2160,25 @@ void BX_CPU_C::PSRAW_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm()), result;
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm()), result;
   Bit8u shift = i->Ib();
 
-  if(shift == 0) {
-    BX_WRITE_MMX_REG(i->nnn(), op);
-    return;
-  }
-
   if(shift > 15) {
-    MMXUW0(result) = (MMXUW0(op) & 0x8000) ? 0xffff : 0;
-    MMXUW1(result) = (MMXUW1(op) & 0x8000) ? 0xffff : 0;
-    MMXUW2(result) = (MMXUW2(op) & 0x8000) ? 0xffff : 0;
-    MMXUW3(result) = (MMXUW3(op) & 0x8000) ? 0xffff : 0;
+    MMXUW0(result) = (MMXUW0(op1) & 0x8000) ? 0xffff : 0;
+    MMXUW1(result) = (MMXUW1(op1) & 0x8000) ? 0xffff : 0;
+    MMXUW2(result) = (MMXUW2(op1) & 0x8000) ? 0xffff : 0;
+    MMXUW3(result) = (MMXUW3(op1) & 0x8000) ? 0xffff : 0;
   }
   else {
-    MMXUW0(result) = MMXUW0(op) >> shift;
-    MMXUW1(result) = MMXUW1(op) >> shift;
-    MMXUW2(result) = MMXUW2(op) >> shift;
-    MMXUW3(result) = MMXUW3(op) >> shift;
+    MMXUW0(result) = MMXUW0(op1) >> shift;
+    MMXUW1(result) = MMXUW1(op1) >> shift;
+    MMXUW2(result) = MMXUW2(op1) >> shift;
+    MMXUW3(result) = MMXUW3(op1) >> shift;
 
-    if(MMXUW0(op) & 0x8000) MMXUW0(result) |= (0xffff << (16 - shift));
-    if(MMXUW1(op) & 0x8000) MMXUW1(result) |= (0xffff << (16 - shift));
-    if(MMXUW2(op) & 0x8000) MMXUW2(result) |= (0xffff << (16 - shift));
-    if(MMXUW3(op) & 0x8000) MMXUW3(result) |= (0xffff << (16 - shift));
+    if(MMXUW0(op1) & 0x8000) MMXUW0(result) |= (0xffff << (16 - shift));
+    if(MMXUW1(op1) & 0x8000) MMXUW1(result) |= (0xffff << (16 - shift));
+    if(MMXUW2(op1) & 0x8000) MMXUW2(result) |= (0xffff << (16 - shift));
+    if(MMXUW3(op1) & 0x8000) MMXUW3(result) |= (0xffff << (16 - shift));
   }
 
   /* now write result back to destination */
@@ -2206,20 +2195,20 @@ void BX_CPU_C::PSLLW_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
-  if(shift > 15) MMXUQ(op) = 0;
+  if(shift > 15) MMXUQ(op1) = 0;
   else
   {
-    MMXUW0(op) <<= shift;
-    MMXUW1(op) <<= shift;
-    MMXUW2(op) <<= shift;
-    MMXUW3(op) <<= shift;
+    MMXUW0(op1) <<= shift;
+    MMXUW1(op1) <<= shift;
+    MMXUW2(op1) <<= shift;
+    MMXUW3(op1) <<= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSLLW_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);
@@ -2232,18 +2221,18 @@ void BX_CPU_C::PSRLD_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
-  if(shift > 31) MMXUQ(op) = 0;
+  if(shift > 31) MMXUQ(op1) = 0;
   else
   {
-    MMXUD0(op) >>= shift;
-    MMXUD1(op) >>= shift;
+    MMXUD0(op1) <<= shift;
+    MMXUD1(op1) <<= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSRLD_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);
@@ -2256,26 +2245,21 @@ void BX_CPU_C::PSRAD_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm()), result;
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm()), result;
   Bit8u shift = i->Ib();
 
-  if(shift == 0) {
-    BX_WRITE_MMX_REG(i->nnn(), op);
-    return;
-  }
-
   if(shift > 31) {
-    MMXUD0(result) = (MMXUD0(op) & 0x80000000) ? 0xffffffff : 0;
-    MMXUD1(result) = (MMXUD1(op) & 0x80000000) ? 0xffffffff : 0;
+    MMXUD0(result) = (MMXUD0(op1) & 0x80000000) ? 0xffffffff : 0;
+    MMXUD1(result) = (MMXUD1(op1) & 0x80000000) ? 0xffffffff : 0;
   }
   else {
-    MMXUD0(result) = MMXUD0(op) >> shift;
-    MMXUD1(result) = MMXUD1(op) >> shift;
+    MMXUD0(result) = MMXUD0(op1) >> shift;
+    MMXUD1(result) = MMXUD1(op1) >> shift;
 
-    if(MMXUD0(op) & 0x80000000) 
+    if(MMXUD0(op1) & 0x80000000) 
        MMXUD0(result) |= (0xffffffff << (32 - shift));
 
-    if(MMXUD1(op) & 0x80000000) 
+    if(MMXUD1(op1) & 0x80000000) 
        MMXUD1(result) |= (0xffffffff << (32 - shift));
   }
 
@@ -2293,18 +2277,18 @@ void BX_CPU_C::PSLLD_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
-  if(shift > 31) MMXUQ(op) = 0;
+  if(shift > 31) MMXUQ(op1) = 0;
   else
   {
-    MMXUD0(op) <<= shift;
-    MMXUD1(op) <<= shift;
+    MMXUD0(op1) <<= shift;
+    MMXUD1(op1) <<= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSLLD_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);
@@ -2317,18 +2301,18 @@ void BX_CPU_C::PSRLQ_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
   if(shift > 63) {
-    MMXUQ(op) = 0;
+    MMXUQ(op1) = 0;
   }
   else {
-    MMXUQ(op) >>= shift;
+    MMXUQ(op1) >>= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSRLQ_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);
@@ -2341,18 +2325,18 @@ void BX_CPU_C::PSLLQ_PqIb(bxInstruction_c *i)
 #if BX_SUPPORT_MMX
   BX_CPU_THIS_PTR prepareMMX();
 
-  BxPackedMmxRegister op = BX_READ_MMX_REG(i->rm());
+  BxPackedMmxRegister op1 = BX_READ_MMX_REG(i->rm());
   Bit8u shift = i->Ib();
 
   if(shift > 63) {
-    MMXUQ(op) = 0;
+    MMXUQ(op1) = 0;
   }
   else {
-    MMXUQ(op) <<= shift;
+    MMXUQ(op1) <<= shift;
   }
 
   /* now write result back to destination */
-  BX_WRITE_MMX_REG(i->rm(), op);
+  BX_WRITE_MMX_REG(i->rm(), op1);
 #else
   BX_INFO(("PSLLQ_PqIb: MMX not supported in current configuration"));
   UndefinedOpcode(i);

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: vga.cc,v 1.57 2003-01-01 21:21:29 vruppert Exp $
+// $Id: vga.cc,v 1.53.2.1 2003-01-03 00:29:33 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -37,14 +37,6 @@
 /* NOTES:
  * I take it data rotate is a true rotate with carry of bit 0 to bit 7.
  * support map mask (3c5 reg 02)
- */
-
-/* Notes from cb
- *
- * It seems that the vga card should support multi bytes IO reads and write
- * From my tests, inw(port) return port+1 * 256 + port, except for port 0x3c9
- * (PEL data register, data cycling). More reverse engineering is needed.
- * This would fix the gentoo bug.
  */
 
 // (mch)
@@ -320,11 +312,6 @@ bx_vga_c::determine_screen_dimensions(unsigned *piHeight, unsigned *piWidth)
         *piHeight = v;
         }
       }
-    else if ((h >= 640) && (v >= 480)) {
-      *piWidth = h;
-      *piHeight = v;
-      BX_VGA_THIS s.scan_bits = BX_VGA_THIS s.CRTC.reg[19] << 4;
-      }
     }
   else if ( BX_VGA_THIS s.graphics_ctrl.shift_reg == 2 )
     {
@@ -336,7 +323,7 @@ bx_vga_c::determine_screen_dimensions(unsigned *piHeight, unsigned *piWidth)
       }
     else
       {
-      *piWidth = h;
+      *piWidth = h / 2;
       *piHeight = v;
       }
     }
@@ -1502,7 +1489,7 @@ bx_vga_c::update(void)
 	      for (r=0; r<Y_TILESIZE; r++) {
 		for (c=0; c<X_TILESIZE; c++) {
 		  pixely = ((yti*Y_TILESIZE) + r);
-		  pixelx = ((xti*X_TILESIZE) + c) / 2;
+		  pixelx = ((xti*X_TILESIZE) + c);
 		  plane  = (pixelx % 4);
 		  byte_offset = (plane * 65536) +
 				(pixely * (BX_VGA_THIS s.CRTC.reg[0x13]<<1))
