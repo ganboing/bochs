@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: ne2k.h,v 1.10 2002-11-19 18:56:39 vruppert Exp $
+// $Id: ne2k.h,v 1.9 2002-10-25 11:44:40 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -36,7 +36,7 @@
 
 #if BX_USE_NE2K_SMF
 #  define BX_NE2K_SMF  static
-#  define BX_NE2K_THIS theNE2kDevice->
+#  define BX_NE2K_THIS bx_ne2k.
 #else
 #  define BX_NE2K_SMF
 #  define BX_NE2K_THIS this->
@@ -193,13 +193,13 @@ typedef struct {
 
 
 
-class bx_ne2k_c : public bx_ne2k_stub_c {
+class bx_ne2k_c : public logfunctions {
 public:
   bx_ne2k_c(void);
   ~bx_ne2k_c(void);
-  virtual void init(void);
-  virtual void reset(unsigned type);
-  virtual void print_info (FILE *file, int page, int reg, int nodups);
+  BX_NE2K_SMF void   init(void);
+  BX_NE2K_SMF void   reset(unsigned type);
+  void print_info (FILE *file, int page, int reg, int nodups);
 
 private:
   bx_ne2k_t s;
@@ -237,3 +237,7 @@ private:
   void   write(Bit32u address, Bit32u value, unsigned io_len);
 #endif
 };
+
+#if BX_USE_NE2K_SMF
+extern bx_ne2k_c bx_ne2k;
+#endif
