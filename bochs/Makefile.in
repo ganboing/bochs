@@ -25,9 +25,9 @@
 # the following rules:
 #   use $(VAR) not ${VAR}
 
-VERSION=1.2.x
-VER_STRING=cvs-snapshot
-REL_STRING=
+VERSION=1.2.pre2
+VER_STRING=1.2-pre2
+REL_STRING=June 1, 2001
 PREFIX=/usr/local/bochs
 BINPATH=/usr/local/bin
 INSTALL_LIST=bios/BIOS-* CHANGES COPYING README bios/VGABIOS* bochs bximage build/linux/DOC-linux.html
