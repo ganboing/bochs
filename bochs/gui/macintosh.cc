@@ -221,7 +221,7 @@ void CreateTile(void)
 		err = NewGWorld(&gOffWorld, 8, 
 			&srcTileRect, gCTable, NULL, useTempMem);
 		if (err != noErr)
-			BX_PANIC(("mac: can't create gOffWorld"));
+			bx_panic("mac: can't create gOffWorld");
 
 		SetGWorld(gOffWorld, NULL);
 	
@@ -236,7 +236,7 @@ void CreateTile(void)
 			(**gTile).pmTable = gCTable;
 		}
 		else
-			BX_PANIC(("mac: can't create gTile"));
+			bx_panic("mac: can't create gTile");
 	
 		SetGWorld(savePort, saveDevice);
 	}
@@ -244,7 +244,7 @@ void CreateTile(void)
 	{
 		gTile = CreatePixMap(0, 0, srcTileRect.right, srcTileRect.bottom, 8, gCTable);
 		if (gTile == NULL)
-			BX_PANIC(("mac: can't create gTile"));
+			bx_panic("mac: can't create gTile");
 	}
 }
 
@@ -282,7 +282,7 @@ void CreateWindows(void)
 	toolwin = NewCWindow(NULL, &winRect, "\pMacBochs 586", true, floatProc,
 		(WindowPtr)-1, false, 0);
 	if (toolwin == NULL)
-		BX_PANIC(("mac: can't create tool window"));
+		bx_panic("mac: can't create tool window");
 	// Create a moveable tool window for the "headerbar"
 	
 	SetRect(&winRect, l, t, r, b);
@@ -292,7 +292,7 @@ void CreateWindows(void)
 	win = NewCWindow(NULL, &winRect, "\pMacBochs 586", true, documentProc,
 		(WindowPtr)-1, true, 1);
 	if (win == NULL)
-		BX_PANIC(("mac: can't create emulator window"));
+		bx_panic("mac: can't create emulator window");
 	
 	FixWindow();
 
@@ -324,7 +324,6 @@ void CreateWindows(void)
 void bx_gui_c::specific_init(bx_gui_c *th, int argc, char **argv, unsigned tilewidth, unsigned tileheight,
 										 unsigned headerbar_y)
 {	
-	th->setprefix("[MGUI]");
 	InitToolbox();
 	
 	//SouixWin = FrontWindow();
@@ -496,7 +495,7 @@ void HandleMenuChoice(long menuChoice)
 			switch(item) 
 			{
 				case iQuit:
-					BX_PANIC(("User terminated"));
+					bx_panic("User terminated");
 					break;
 					
 				default:
@@ -1430,7 +1429,7 @@ void CreateKeyMap(void)
 
 	KCHR = NewPtrClear(390);
 	if (KCHR == NULL)
-		BX_PANIC(("mac: can't allocate memory for key map"));
+		bx_panic("mac: can't allocate memory for key map");
 	BlockMove(KCHRHeader, KCHR, sizeof(KCHRHeader));
 	BlockMove(KCHRTable, Ptr(KCHR + sizeof(KCHRHeader)), sizeof(KCHRTable));
 }
@@ -1474,7 +1473,7 @@ BitMap *CreateBitMap(unsigned width,	unsigned height)
 	row_bytes = (( width + 31) >> 5) << 2;
 	bm = (BitMap *)calloc(1, sizeof(BitMap));
 	if (bm == NULL)
-		BX_PANIC(("mac: can't allocate memory for pixmap"));
+		bx_panic("mac: can't allocate memory for pixmap");
 	SetRect(&bm->bounds, 0, 0, width, height);
 	bm->rowBytes = row_bytes;
 	// Quickdraw allocates a new color table by default, but we want to
@@ -1496,7 +1495,7 @@ PixMapHandle CreatePixMap(unsigned left, unsigned top, unsigned width,
 	row_bytes = (((long) depth * ((long) width) + 31) >> 5) << 2;
 	pm = NewPixMap();
 	if (pm == NULL)
-		BX_PANIC(("mac: can't allocate memory for pixmap"));
+		bx_panic("mac: can't allocate memory for pixmap");
 	(**pm).bounds.left = left;
 	(**pm).bounds.top = top;
 	(**pm).bounds.right = left+width;

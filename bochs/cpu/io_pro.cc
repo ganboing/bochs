@@ -27,7 +27,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS BX_CPU_THIS_PTR
 
 
 
@@ -39,7 +38,7 @@ BX_CPU_C::inp16(Bit16u addr)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 2) ) {
-      // BX_INFO(("cpu_inp16: GP0()!\n"));
+      // bx_printf("cpu_inp16: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return(0);
       }
@@ -58,7 +57,7 @@ BX_CPU_C::outp16(Bit16u addr, Bit16u value)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 2) ) {
-      // BX_INFO(("cpu_outp16: GP0()!\n"));
+      // bx_printf("cpu_outp16: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -74,7 +73,7 @@ BX_CPU_C::inp32(Bit16u addr)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 4) ) {
-      // BX_INFO(("cpu_inp32: GP0()!\n"));
+      // bx_printf("cpu_inp32: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return(0);
       }
@@ -93,7 +92,7 @@ BX_CPU_C::outp32(Bit16u addr, Bit32u value)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 4) ) {
-      // BX_INFO(("cpu_outp32: GP0()!\n"));
+      // bx_printf("cpu_outp32: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -109,7 +108,7 @@ BX_CPU_C::inp8(Bit16u addr)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 1) ) {
-      // BX_INFO(("cpu_inp8: GP0()!\n"));
+      // bx_printf("cpu_inp8: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return(0);
       }
@@ -129,7 +128,7 @@ BX_CPU_C::outp8(Bit16u addr, Bit8u value)
 
   if (BX_CPU_THIS_PTR cr0.pe && (BX_CPU_THIS_PTR eflags.vm || (CPL>IOPL))) {
     if ( !BX_CPU_THIS_PTR allow_io(addr, 1) ) {
-      // BX_INFO(("cpu_outp8: GP0()!\n"));
+      // bx_printf("cpu_outp8: GP0()!\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -146,28 +145,28 @@ BX_CPU_C::allow_io(Bit16u addr, unsigned len)
   unsigned bit_index, i;
 
   if (BX_CPU_THIS_PTR tr.cache.valid==0 || BX_CPU_THIS_PTR tr.cache.type!=9) {
-    BX_INFO(("allow_io(): TR doesn't point to a valid 32bit TSS\n"));
+    bx_printf("allow_io(): TR doesn't point to a valid 32bit TSS\n");
     return(0);
     }
 
   if (BX_CPU_THIS_PTR tr.cache.u.tss386.limit_scaled < 103) {
-    BX_PANIC(("allow_io(): TR.limit < 103\n"));
+    bx_panic("allow_io(): TR.limit < 103\n");
     }
 
   access_linear(BX_CPU_THIS_PTR tr.cache.u.tss386.base + 102, 2, 0, BX_READ,
                          &io_base);
   if (io_base <= 103) {
-BX_INFO(("PE is %u\n", BX_CPU_THIS_PTR cr0.pe));
-BX_INFO(("VM is %u\n", BX_CPU_THIS_PTR eflags.vm));
-BX_INFO(("CPL is %u\n", CPL));
-BX_INFO(("IOPL is %u\n", IOPL));
-BX_INFO(("addr is %u\n", addr));
-BX_INFO(("len is %u\n", len));
-    BX_PANIC(("allow_io(): TR:io_base <= 103\n"));
+bx_printf("PE is %u\n", BX_CPU_THIS_PTR cr0.pe);
+bx_printf("VM is %u\n", BX_CPU_THIS_PTR eflags.vm);
+bx_printf("CPL is %u\n", CPL);
+bx_printf("IOPL is %u\n", IOPL);
+bx_printf("addr is %u\n", addr);
+bx_printf("len is %u\n", len);
+    bx_panic("allow_io(): TR:io_base <= 103\n");
     }
 
   if (io_base > BX_CPU_THIS_PTR tr.cache.u.tss386.limit_scaled) {
-    BX_INFO(("allow_io(): CPL > IOPL: no IO bitmap defined #GP(0)\n"));
+    bx_printf("allow_io(): CPL > IOPL: no IO bitmap defined #GP(0)\n");
     return(0);
     }
 

@@ -58,7 +58,6 @@
 bx_gui_c::specific_init(bx_gui_c *th, int argc, char **argv, unsigned tilewidth, unsigned tileheight,
                      unsigned headerbar_y)
 {
-  th->setprefix("[NGUI]");
   UNUSED(th);
   UNUSED(argc);
   UNUSED(argv);
@@ -69,7 +68,7 @@ bx_gui_c::specific_init(bx_gui_c *th, int argc, char **argv, unsigned tilewidth,
   UNUSED(bochs_icon_bits);  // global variable
 
   if (bx_options.private_colormap) {
-    BX_WARN(("private_colormap option ignored.\n"));
+    fprintf(stderr, "# WARNING: NOGUI: private_colormap option ignored.\n");
     }
 }
 
@@ -286,5 +285,5 @@ bx_gui_c::replace_bitmap(unsigned hbar_id, unsigned bmap_id)
   void
 bx_gui_c::exit(void)
 {
-  BX_WARN(("bx_gui_c::exit() not implemented yet.\n"));
+  fprintf(stderr, "# WARNING: win32: bx_gui_c::exit() not implemented yet.\n");
 }

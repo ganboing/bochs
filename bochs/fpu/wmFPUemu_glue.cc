@@ -33,8 +33,6 @@ extern "C" {
 #include "linux/signal.h"
 }
 
-#define LOG_THIS genlog->
-
 // Use this to hold a pointer to the instruction since
 // we can't pass this to the FPU emulation routines, which
 // will ultimately call routines here.
@@ -134,7 +132,7 @@ fpu_get_ds(void)
 fpu_set_ax(unsigned short val16)
 {
   AX = val16;
-//BX_DEBUG(( "fpu_set_ax(0x%04x)\n", (unsigned) val16));
+//fprintf(stderr, "fpu_set_ax(0x%04x)\n", (unsigned) val16);
 }
 
   void
@@ -150,14 +148,14 @@ fpu_verify_area(unsigned what, void *ptr, unsigned n)
   else {  // VERIFY_WRITE
     BX_CPU.write_virtual_checks(seg, PTR2INT(ptr), n);
     }
-//BX_DEBUG(( "verify_area: 0x%x\n", PTR2INT(ptr)));
+//fprintf(stderr, "verify_area: 0x%x\n", PTR2INT(ptr));
 }
 
 
   void
 FPU_printall(void)
 {
-  BX_PANIC(("FPU_printall\n"));
+  bx_panic("FPU_printall\n");
 }
 
 
@@ -181,7 +179,7 @@ fpu_get_user(void *ptr, unsigned len)
       BX_CPU.read_virtual_dword(fpu_iptr->seg, PTR2INT(ptr), &val32);
       break;
     default:
-      BX_PANIC(("fpu_get_user: len=%u\n", len));
+      bx_panic("fpu_get_user: len=%u\n", len);
     }
   return(val32);
 }
@@ -207,7 +205,7 @@ fpu_put_user(unsigned val, void *ptr, unsigned len)
       BX_CPU.write_virtual_dword(fpu_iptr->seg, PTR2INT(ptr), &val32);
       break;
     default:
-      BX_PANIC(("fpu_put_user: len=%u\n", len));
+      bx_panic("fpu_put_user: len=%u\n", len);
     }
 }
 
@@ -225,28 +223,28 @@ math_abort(struct info *info, unsigned int signal)
     case SIGFPE:
       if (BX_CPU.cr0.ne == 0) {
         // MSDOS compatibility external interrupt (IRQ13)
-        BX_PANIC (("math_abort: MSDOS compatibility not supported yet\n"));
+        bx_panic("math_abort: MSDOS compatibility not supported yet\n");
         }
       BX_CPU.exception(BX_MF_EXCEPTION, 0, 0);
       // execution does not reach here
 
     case SIGILL:
-      BX_PANIC (("math_abort: SIGILL not implemented yet.\n"));
+      bx_panic("math_abort: SIGILL not implemented yet.\n");
       break;
     case SIGSEGV:
-      BX_PANIC (("math_abort: SIGSEGV not implemented yet.\n"));
+      bx_panic("math_abort: SIGSEGV not implemented yet.\n");
       break;
     }
 
 #else
   UNUSED(signal);
-  BX_INFO(("math_abort: CPU<4 not supported yet\n"));
+  bx_panic("math_abort: CPU<4 not supported yet\n");
 #endif
 }
 
   int
 printk(const char * fmt, ...)
 {
-  BX_INFO(("printk not complete: %s\n", fmt));
+  bx_printf("printk not complete: %s\n", fmt);
   return(0); // for now
 }

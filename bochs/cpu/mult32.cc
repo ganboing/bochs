@@ -26,7 +26,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS BX_CPU_THIS_PTR
 
 
 
@@ -197,7 +196,7 @@ BX_CPU_C::IDIV_EAXEd(BxInstruction_t *i)
 BX_CPU_C::IMUL_GdEdId(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("IMUL_GdEdId() unsupported on 8086!\n"));
+  bx_panic("IMUL_GdEdId() unsupported on 8086!\n");
 #else
 
 
@@ -241,7 +240,7 @@ BX_CPU_C::IMUL_GdEdId(BxInstruction_t *i)
 BX_CPU_C::IMUL_GdEd(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 3
-  BX_PANIC(("IMUL_GvEv() unsupported on 8086!\n"));
+  bx_panic("IMUL_GvEv() unsupported on 8086!\n");
 #else
 
     Bit32s op1_32, op2_32, product_32;

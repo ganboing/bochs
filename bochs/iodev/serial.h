@@ -139,7 +139,7 @@ typedef struct {
 
 
 
-class bx_serial_c : public logfunctions {
+class bx_serial_c {
 public:
   bx_serial_c(void);
   ~bx_serial_c(void);
@@ -168,4 +168,6 @@ private:
   };
 
 
+#if BX_USE_SER_SMF
 extern bx_serial_c bx_serial;
+#endif

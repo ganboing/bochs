@@ -27,101 +27,100 @@
 
 
 #include "bochs.h"
-#define LOG_THIS log->
-
 
 
 FILE *state_file::get_handle()
 {
-  BX_INFO(("state_file::get_handle()\n"));
+  fprintf(stderr, "# state_file::get_handle()\n");
   return NULL;
 }
 	
 void state_file::write(Bit8u)
 {
-  BX_PANIC(("state_file::write(Bit8u)\n"));
+  fprintf(stderr, "# state_file::write(Bit8u)\n");
+  exit(1);
 }
 
 void state_file::write(Bit16u)
 {
-  BX_PANIC(("state_file::write(Bit16u)\n"));
+  fprintf(stderr, "# state_file::write(Bit16u)\n");
+  exit(1);
 }
 
 void state_file::write(Bit32u)
 {
-  BX_PANIC(("state_file::write(Bit32u)\n"));
+  fprintf(stderr, "# state_file::write(Bit32u)\n");
+  exit(1);
 }
 
 void state_file::write(Bit64u)
 {
-  BX_PANIC(("state_file::write(Bit64u)\n"));
+  fprintf(stderr, "# state_file::write(Bit64u)\n");
+  exit(1);
 }
 
 void state_file::write(const void *, size_t)
 {
-  BX_PANIC(("state_file::write(const void *, size_t)\n"));
+  fprintf(stderr, "# state_file::write(const void *, size_t)\n");
+  exit(1);
 }
 
 void state_file::read(Bit8u &)
 {
-  BX_PANIC(("state_file::read(uint8 &)\n"));
+  fprintf(stderr, "# state_file::read(uint8 &)\n");
+  exit(1);
 }
 
 void state_file::read(Bit16u &)
 {
-  BX_PANIC(("state_file::read(uint16 &)\n"));
+  fprintf(stderr, "# state_file::read(uint16 &)\n");
+  exit(1);
 }
 
 void state_file::read(Bit32u &)
 {
-  BX_PANIC(("state_file::read(uint32 &)\n"));
+  fprintf(stderr, "# state_file::read(uint32 &)\n");
+  exit(1);
 }
 
 void state_file::read(Bit64u &)
 {
-  BX_PANIC(("state_file::read(uint64 &)\n"));
+  fprintf(stderr, "# state_file::read(uint64 &)\n");
+  exit(1);
 }
 
 void state_file::read(void *, size_t)
 {
-  BX_PANIC(("state_file::read(void *, size_t)\n"));
+  fprintf(stderr, "# state_file::read(void *, size_t)\n");
+  exit(1);
 }
 
 void state_file::write_check(const char *)
 {
-  BX_PANIC(("state_file::write_check()\n"));
+  fprintf(stderr, "# state_file::write_check()\n");
+  exit(1);
 }
 
 void state_file::read_check (const char *)
 {
-  BX_PANIC(("state_file::read_check()\n"));
+  fprintf(stderr, "# state_file::read_check()\n");
+  exit(1);
 }
-
-void
-state_file::init(void)
-{
-	log = new class logfunctions();
-	log->setprefix("[STAT]");
-	log->settype(GENLOG);
-}
-
 
 state_file::state_file (const char *name, const char *options)
 {
-  UNUSED(name);
-  UNUSED(options);
-  init();
-  BX_INFO(( "Init(const char *, const char *).\n" ));
+UNUSED(name);
+UNUSED(options);
+  bx_printf("state_file::state_file()\n");
 }
 
 state_file::state_file (FILE *f)
 {
-  UNUSED(f);
-  init();
-  BX_INFO(("Init(FILE *).\n"));
+UNUSED(f);
+  bx_printf("state_file::state_file(FILE *)\n");
 }
 
 state_file::~state_file()
 {
-  BX_INFO(("Exit.\n"));
+  bx_printf("state_file::~state_file()\n");
 }

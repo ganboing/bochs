@@ -27,7 +27,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS BX_CPU_THIS_PTR
 
 
 
@@ -36,7 +35,7 @@
 BX_CPU_C::ARPL_EwGw(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("ARPL_EwRw: not supported on 8086!\n"));
+  bx_panic("ARPL_EwRw: not supported on 8086!\n");
 #else /* 286+ */
 
   Bit16u op2_16, op1_16;
@@ -99,10 +98,10 @@ BX_CPU_C::LAR_GvEw(BxInstruction_t *i)
   Bit32u dword1, dword2;
 
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   if (real_mode()) {
-    BX_PANIC(("LAR_GvEw: not recognized in real mode\n"));
+    bx_panic("LAR_GvEw: not recognized in real mode\n");
     UndefinedOpcode(i);
     return;
     }
@@ -134,7 +133,7 @@ BX_CPU_C::LAR_GvEw(BxInstruction_t *i)
 
   if (descriptor.valid==0) {
     set_ZF(0);
-    //BX_INFO(("lar(): descriptor valid bit cleared\n"));
+    //bx_printf("lar(): descriptor valid bit cleared\n");
     return;
     }
 
@@ -178,7 +177,7 @@ BX_CPU_C::LAR_GvEw(BxInstruction_t *i)
         break;
       default: /* rest not accepted types to LAR */
         set_ZF(0);
-        BX_INFO(("lar(): not accepted type\n"));
+        bx_printf("lar(): not accepted type\n");
         return;
         break;
       }
@@ -210,11 +209,11 @@ BX_CPU_C::LSL_GvEw(BxInstruction_t *i)
   Bit32u dword1, dword2;
   Bit32u descriptor_dpl;
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
 
   if (real_mode()) {
-    BX_PANIC(("LSL_GvEw: not recognized in real mode\n"));
+    bx_panic("LSL_GvEw: not recognized in real mode\n");
     UndefinedOpcode(i);
     return;
     }
@@ -301,13 +300,13 @@ lsl_ok:
 BX_CPU_C::SLDT_Ew(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("SLDT_Ew: not supported on 8086!\n"));
+  bx_panic("SLDT_Ew: not supported on 8086!\n");
 #else
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   if (real_mode()) {
     /* not recognized in real address mode */
-    BX_PANIC(("SLDT_Ew: encountered in real mode.\n"));
+    bx_panic("SLDT_Ew: encountered in real mode.\n");
     UndefinedOpcode(i);
     }
   else {
@@ -327,11 +326,11 @@ BX_CPU_C::SLDT_Ew(BxInstruction_t *i)
   void
 BX_CPU_C::STR_Ew(BxInstruction_t *i)
 {
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   if (real_mode()) {
     // not recognized in real address mode
-    BX_PANIC(("STR_Ew: encountered in real mode.\n"));
+    bx_panic("STR_Ew: encountered in real mode.\n");
     UndefinedOpcode(i);
     }
   else {
@@ -351,14 +350,14 @@ BX_CPU_C::STR_Ew(BxInstruction_t *i)
 BX_CPU_C::LLDT_Ew(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("LLDT_Ew: not supported on 8086!\n"));
+  bx_panic("LLDT_Ew: not supported on 8086!\n");
 #else
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   invalidate_prefetch_q();
 
   if (real_mode()) {
-    BX_PANIC(("lldt: not recognized in real mode\n"));
+    bx_panic("lldt: not recognized in real mode\n");
     UndefinedOpcode(i);
     return;
     }
@@ -371,7 +370,7 @@ BX_CPU_C::LLDT_Ew(BxInstruction_t *i)
 
     /* #GP(0) if the current privilege level is not 0 */
     if (CPL != 0) {
-      BX_PANIC(("LLDT: CPL != 0\n"));
+      bx_panic("LLDT: CPL != 0\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -395,12 +394,12 @@ BX_CPU_C::LLDT_Ew(BxInstruction_t *i)
 
     // #GP(selector) if the selector operand does not point into GDT
     if (selector.ti != 0) {
-      BX_INFO(("LLDT: selector.ti != 0\n"));
+      bx_printf("LLDT: selector.ti != 0\n");
       exception(BX_GP_EXCEPTION, raw_selector & 0xfffc, 0);
       }
 
     if ((selector.index*8 + 7) > BX_CPU_THIS_PTR gdtr.limit) {
-      BX_PANIC(("lldt: GDT: index > limit\n"));
+      bx_panic("lldt: GDT: index > limit\n");
       exception(BX_GP_EXCEPTION, raw_selector & 0xfffc, 0);
       return;
       }
@@ -416,18 +415,18 @@ BX_CPU_C::LLDT_Ew(BxInstruction_t *i)
     if ( (descriptor.valid==0) ||
         descriptor.segment  ||
         (descriptor.type!=2) ) {
-      BX_INFO(("lldt: doesn't point to an LDT descriptor!\n"));
+      bx_printf("lldt: doesn't point to an LDT descriptor!\n");
       exception(BX_GP_EXCEPTION, raw_selector & 0xfffc, 0);
       }
 
     /* #NP(selector) if LDT descriptor is not present */
     if (descriptor.p==0) {
-      BX_INFO(("lldt: LDT descriptor not present!\n"));
+      bx_printf("lldt: LDT descriptor not present!\n");
       exception(BX_NP_EXCEPTION, raw_selector & 0xfffc, 0);
       }
 
     if (descriptor.u.ldt.limit < 7) {
-      BX_INFO(("lldt: ldtr.limit < 7\n"));
+      bx_printf("lldt: ldtr.limit < 7\n");
       }
 
     BX_CPU_THIS_PTR ldtr.selector = selector;
@@ -443,9 +442,9 @@ BX_CPU_C::LLDT_Ew(BxInstruction_t *i)
 BX_CPU_C::LTR_Ew(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("LTR_Ew: not supported on 8086!\n"));
+  bx_panic("LTR_Ew: not supported on 8086!\n");
 #else
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
 
   invalidate_prefetch_q();
@@ -459,7 +458,7 @@ BX_CPU_C::LTR_Ew(BxInstruction_t *i)
 
     /* #GP(0) if the current privilege level is not 0 */
     if (CPL != 0) {
-      BX_PANIC(("LTR: CPL != 0\n"));
+      bx_panic("LTR: CPL != 0\n");
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -473,7 +472,7 @@ BX_CPU_C::LTR_Ew(BxInstruction_t *i)
 
     /* if selector is NULL, invalidate and done */
     if ((raw_selector & 0xfffc) == 0) {
-      BX_PANIC(("ltr: loading with NULL selector!\n"));
+      bx_panic("ltr: loading with NULL selector!\n");
       /* if this is OK, then invalidate and load selector & descriptor cache */
       /* load here */
       BX_CPU_THIS_PTR tr.selector.value = raw_selector;
@@ -485,7 +484,7 @@ BX_CPU_C::LTR_Ew(BxInstruction_t *i)
     parse_selector(raw_selector, &selector);
 
     if (selector.ti) {
-      BX_PANIC(("ltr: selector.ti != 0\n"));
+      bx_panic("ltr: selector.ti != 0\n");
       return;
       }
 
@@ -497,23 +496,23 @@ BX_CPU_C::LTR_Ew(BxInstruction_t *i)
     /* #GP(selector) if object is not a TSS or is already busy */
     if ( (descriptor.valid==0) || descriptor.segment  ||
          (descriptor.type!=1 && descriptor.type!=9) ) {
-      BX_PANIC(("ltr: doesn't point to an available TSS descriptor!\n"));
+      bx_panic("ltr: doesn't point to an available TSS descriptor!\n");
       exception(BX_GP_EXCEPTION, raw_selector & 0xfffc, 0); /* 0 ??? */
       return;
       }
 
     /* #NP(selector) if TSS descriptor is not present */
     if (descriptor.p==0) {
-      BX_PANIC(("ltr: LDT descriptor not present!\n"));
+      bx_panic("ltr: LDT descriptor not present!\n");
       exception(BX_NP_EXCEPTION, raw_selector & 0xfffc, 0); /* 0 ??? */
       return;
       }
 
     if (descriptor.type==1 && descriptor.u.tss286.limit<43) {
-      BX_PANIC(("ltr:286TSS: loading tr.limit < 43\n"));
+      bx_panic("ltr:286TSS: loading tr.limit < 43\n");
       }
     else if (descriptor.type==9 && descriptor.u.tss386.limit_scaled<103) {
-      BX_PANIC(("ltr:386TSS: loading tr.limit < 103\n"));
+      bx_panic("ltr:386TSS: loading tr.limit < 103\n");
       }
 
     BX_CPU_THIS_PTR tr.selector = selector;
@@ -528,7 +527,7 @@ BX_CPU_C::LTR_Ew(BxInstruction_t *i)
     return;
     }
   else {
-    BX_PANIC(("ltr_ew: not recognized in real-mode!\n"));
+    bx_panic("ltr_ew: not recognized in real-mode!\n");
     UndefinedOpcode(i);
     return;
     }
@@ -544,11 +543,11 @@ BX_CPU_C::VERR_Ew(BxInstruction_t *i)
   bx_selector_t   selector;
   Bit32u dword1, dword2;
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
 
   if (real_mode()) {
-    BX_PANIC(("VERR_Ew: not recognized in real mode\n"));
+    bx_panic("VERR_Ew: not recognized in real mode\n");
     UndefinedOpcode(i);
     return;
     }
@@ -564,7 +563,7 @@ BX_CPU_C::VERR_Ew(BxInstruction_t *i)
   /* if selector null, clear ZF and done */
   if ( (raw_selector & 0xfffc) == 0 ) {
     set_ZF(0);
-    BX_INFO(("VERR: null selector\n"));
+    bx_printf("VERR: null selector\n");
     return;
     }
 
@@ -576,7 +575,7 @@ BX_CPU_C::VERR_Ew(BxInstruction_t *i)
   if ( !fetch_raw_descriptor2(&selector, &dword1, &dword2) ) {
     /* not within descriptor table */
     set_ZF(0);
-    BX_INFO(("VERR: not in table\n"));
+    bx_printf("VERR: not in table\n");
     return;
     }
 
@@ -584,13 +583,13 @@ BX_CPU_C::VERR_Ew(BxInstruction_t *i)
 
   if ( descriptor.segment==0 ) { /* system or gate descriptor */
     set_ZF(0); /* inaccessible */
-    BX_INFO(("VERR: system descriptor\n"));
+    bx_printf("VERR: system descriptor\n");
     return;
     }
 
   if ( descriptor.valid==0 ) {
     set_ZF(0);
-    BX_INFO(("VERR: valid bit cleared\n"));
+    bx_printf("VERR: valid bit cleared\n");
     return;
     }
 
@@ -600,32 +599,32 @@ BX_CPU_C::VERR_Ew(BxInstruction_t *i)
     if ( descriptor.u.segment.c_ed &&
          descriptor.u.segment.r_w) {
       set_ZF(1); /* accessible */
-      BX_INFO(("VERR: conforming code, OK\n"));
+      bx_printf("VERR: conforming code, OK\n");
       return;
       }
     if ( descriptor.u.segment.r_w==0 ) {
       set_ZF(0); /* inaccessible */
-      BX_INFO(("VERR: code not readable\n"));
+      bx_printf("VERR: code not readable\n");
       return;
       }
     /* readable, non-conforming code segment */
     if ( (descriptor.dpl<CPL) || (descriptor.dpl<selector.rpl) ) {
       set_ZF(0); /* inaccessible */
-      BX_INFO(("VERR: non-coforming code not withing priv level\n"));
+      bx_printf("VERR: non-coforming code not withing priv level\n");
       return;
       }
     set_ZF(1); /* accessible */
-    BX_INFO(("VERR: code seg readable\n"));
+    bx_printf("VERR: code seg readable\n");
     return;
     }
   else { /* data segment */
     if ( (descriptor.dpl<CPL) || (descriptor.dpl<selector.rpl) ) {
       set_ZF(0); /* not accessible */
-      BX_INFO(("VERR: data seg not withing priv level\n"));
+      bx_printf("VERR: data seg not withing priv level\n");
       return;
       }
     set_ZF(1); /* accessible */
-    BX_INFO(("VERR: data segment OK\n"));
+    bx_printf("VERR: data segment OK\n");
     return;
     }
 }
@@ -639,11 +638,11 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
   bx_selector_t   selector;
   Bit32u dword1, dword2;
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
 
   if (real_mode()) {
-    BX_PANIC(("VERW_Ew: not recognized in real mode\n"));
+    bx_panic("VERW_Ew: not recognized in real mode\n");
     UndefinedOpcode(i);
     return;
     }
@@ -659,7 +658,7 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
   /* if selector null, clear ZF and done */
   if ( (raw_selector & 0xfffc) == 0 ) {
     set_ZF(0);
-    BX_INFO(("VERW: null selector\n"));
+    bx_printf("VERW: null selector\n");
     return;
     }
 
@@ -671,7 +670,7 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
   if ( !fetch_raw_descriptor2(&selector, &dword1, &dword2) ) {
     /* not within descriptor table */
     set_ZF(0);
-    BX_INFO(("VERW: not in table\n"));
+    bx_printf("VERW: not in table\n");
     return;
     }
 
@@ -680,13 +679,13 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
   /* rule out system segments & code segments */
   if ( descriptor.segment==0 || descriptor.u.segment.executable ) {
     set_ZF(0);
-    BX_INFO(("VERW: system seg or code\n"));
+    bx_printf("VERW: system seg or code\n");
     return;
     }
 
   if ( descriptor.valid==0 ) {
     set_ZF(0);
-    BX_INFO(("VERW: valid bit cleared\n"));
+    bx_printf("VERW: valid bit cleared\n");
     return;
     }
 
@@ -694,16 +693,16 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
   if ( descriptor.u.segment.r_w ) { /* writable */
     if ( (descriptor.dpl<CPL) || (descriptor.dpl<selector.rpl) ) {
       set_ZF(0); /* not accessible */
-      BX_INFO(("VERW: writable data seg not within priv level\n"));
+      bx_printf("VERW: writable data seg not within priv level\n");
       return;
       }
     set_ZF(1); /* accessible */
-    BX_INFO(("VERW: data seg writable\n"));
+    bx_printf("VERW: data seg writable\n");
     return;
     }
 
   set_ZF(0); /* not accessible */
-  BX_INFO(("VERW: data seg not writable\n"));
+  bx_printf("VERW: data seg not writable\n");
   return;
 }
 
@@ -711,18 +710,18 @@ BX_CPU_C::VERW_Ew(BxInstruction_t *i)
 BX_CPU_C::SGDT_Ms(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("SGDT_Ms: not supported on 8086!\n"));
+  bx_panic("SGDT_Ms: not supported on 8086!\n");
 #else
   Bit16u limit_16;
   Bit32u base_32;
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
 
   /* op1 is a register or memory reference */
   if (i->mod == 0xc0) {
     /* undefined opcode exception */
-    BX_PANIC(("SGDT_Ms: use of register is undefined opcode.\n"));
+    bx_panic("SGDT_Ms: use of register is undefined opcode.\n");
     UndefinedOpcode(i);
     return;
     }
@@ -745,17 +744,17 @@ BX_CPU_C::SGDT_Ms(BxInstruction_t *i)
 BX_CPU_C::SIDT_Ms(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("SIDT_Ms: not supported on 8086!\n"));
+  bx_panic("SIDT_Ms: not supported on 8086!\n");
 #else
   Bit16u limit_16;
   Bit32u base_32;
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   /* op1 is a register or memory reference */
   if (i->mod == 0xc0) {
     /* undefined opcode exception */
-    BX_PANIC(("SIDT: use of register is undefined opcode.\n"));
+    bx_panic("SIDT: use of register is undefined opcode.\n");
     UndefinedOpcode(i);
     return;
     }
@@ -780,22 +779,22 @@ BX_CPU_C::SIDT_Ms(BxInstruction_t *i)
 BX_CPU_C::LGDT_Ms(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("LGDT_Ms: not supported on 8086!\n"));
+  bx_panic("LGDT_Ms: not supported on 8086!\n");
 #else
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   invalidate_prefetch_q();
 
   if (protected_mode() && (CPL!=0)) {
-    BX_PANIC(("LGDT: protected mode: CPL!=0\n"));
+    bx_panic("LGDT: protected mode: CPL!=0\n");
     exception(BX_GP_EXCEPTION, 0, 0);
     return;
     }
 
   /* op1 is a register or memory reference */
   if (i->mod == 0xc0) {
-    BX_PANIC(("LGDT generating exception 6\n"));
+    bx_panic("LGDT generating exception 6\n");
     UndefinedOpcode(i);
     return;
     }
@@ -836,19 +835,19 @@ BX_CPU_C::LGDT_Ms(BxInstruction_t *i)
 BX_CPU_C::LIDT_Ms(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("LIDT_Ms: not supported on 8086!\n"));
+  bx_panic("LIDT_Ms: not supported on 8086!\n");
 #else
   Bit16u limit_16;
   Bit32u base_32;
 
 
-  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported\n"));
+  if (v8086_mode()) bx_panic("protect_ctrl: v8086 mode unsupported\n");
 
   invalidate_prefetch_q();
 
   if (protected_mode()) {
     if (CPL != 0) {
-      BX_PANIC(("LIDT(): CPL(%u) != 0\n", (unsigned) CPL));
+      bx_panic("LIDT(): CPL(%u) != 0\n", (unsigned) CPL);
       exception(BX_GP_EXCEPTION, 0, 0);
       return;
       }
@@ -857,7 +856,7 @@ BX_CPU_C::LIDT_Ms(BxInstruction_t *i)
   /* op1 is a register or memory reference */
   if (i->mod == 0xc0) {
     /* undefined opcode exception */
-    BX_PANIC(("LIDT generating exception 6\n"));
+    bx_panic("LIDT generating exception 6\n");
     UndefinedOpcode(i);
     return;
     }

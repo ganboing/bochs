@@ -39,7 +39,7 @@
 
 
 
-class bx_dma_c : public logfunctions {
+class bx_dma_c {
 public:
 
   bx_dma_c();
@@ -82,6 +82,8 @@ private:
   bx_devices_c *devices;
   };
 
+#if BX_USE_DMA_SMF
 extern bx_dma_c bx_dma;
+#endif
 
 #endif  // #ifndef _PCDMA_H

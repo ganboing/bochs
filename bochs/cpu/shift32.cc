@@ -26,7 +26,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS BX_CPU_THIS_PTR
 
 
   void
@@ -80,7 +79,7 @@ BX_CPU_C::SHLD_EdGd(BxInstruction_t *i)
 BX_CPU_C::SHRD_EdGd(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 3
-  BX_PANIC(("shrd_evgvib: not supported on < 386\n"));
+  bx_panic("shrd_evgvib: not supported on < 386\n");
 #else
   Bit32u op1_32, op2_32, result_32;
   unsigned count;

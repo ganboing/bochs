@@ -24,7 +24,7 @@
 // Header file for low-level OS specific CDROM emulation
 
 
-class cdrom_interface : public logfunctions {
+class cdrom_interface {
 public:
   cdrom_interface(char *dev);
   ~cdrom_interface(void);

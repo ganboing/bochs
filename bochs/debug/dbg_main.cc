@@ -26,7 +26,6 @@ extern "C" {
 }
 
 #include "bochs.h"
-#define LOG_THIS genlog->
 
 static unsigned doit = 0;
 
@@ -261,8 +260,8 @@ bx_dbg_main(int argc, char *argv[])
   i = 1;
   if ( (argc >= 2) && !strcmp(argv[1], "-rc") ) {
     if ( argc == 2 ) {
-      BX_ERROR(( "%s: -rc option used, but no path specified.\n",
-        argv[0] ));
+      fprintf(stderr, "%s: -rc option used, but no path specified.\n",
+        argv[0]);
       bx_dbg_usage();
       exit(1);
       }
@@ -315,10 +314,10 @@ process_sim2:
 
 
   if (bx_debug_rc_fname[0] == '\0') {
-    BX_INFO(("Warning: no rc file specified.\n", argv[0]));
+    fprintf(stderr, "%s: Warning: no rc file specified.\n", argv[0]);
     }
   else {
-    BX_INFO (("%s: using rc file '%s'.\n", argv[0], bx_debug_rc_fname));
+    fprintf(stderr, "%s: using rc file '%s'.\n", argv[0], bx_debug_rc_fname);
     // if there's an error, the user will know about it before proceeding
     (void) bx_nest_infile(bx_debug_rc_fname);
     }
@@ -354,7 +353,6 @@ process_sim2:
 
   // (mch) Moved from main.cc
   bx_devices.init();
-  bx_gui.init_signal_handlers ();
   bx_pc_system.start_timers();
 
   // setup Ctrl-C handler
@@ -371,7 +369,7 @@ process_sim2:
   void
 bx_dbg_usage(void)
 {
-  fprintf (stderr, "usage: %s [-rc path] [-sim1 ... ] [-sim2 ... ]\n", argv0);
+  fprintf(stderr, "usage: %s [-rc path] [-sim1 ... ] [-sim2 ... ]\n", argv0);
 }
 
 
@@ -555,7 +553,7 @@ bx_debug_ctrlc_handler(int signum)
   void
 bx_dbg_exit(int code)
 {
-  BX_DEBUG(( "dbg: before sim1_exit\n" ));
+  fprintf(stderr, "before sim1_exit\n");
   bx_dbg_callback[0].atexit();
 
 #if BX_NUM_SIMULATORS >= 2
@@ -565,6 +563,7 @@ bx_dbg_exit(int code)
 
   bx_atexit();
 
+  fprintf(stderr, "before exit\n");
   exit(code);
 }
 
@@ -576,7 +575,7 @@ bx_dbg_exit(int code)
   void
 bx_dbg_quit_command(void)
 {
-  BX_INFO(("dbg: Quit\n"));
+  fprintf(stderr, "Quit\n");
   bx_dbg_exit(0);
 }
 
@@ -1090,7 +1089,7 @@ enter_playback_entry()
       last_playback_time = time;
 
       if (diff < 0) {
-	    BX_PANIC(("Negative diff in playback"));
+	    bx_panic("Negative diff in playback");
       } else if (diff == 0) {
 	    playback_entry.trigger();
       } else {
@@ -2344,7 +2343,7 @@ bx_dbg_dump_cpu_command(void)
 
 #if BX_PCI_SUPPORT
   if (bx_options.i440FXSupport) {
-    bx_devices.pci->print_i440fx_state();
+    bx_devices.pci->print_i440fx_state(stderr);
     }
 #endif
 
