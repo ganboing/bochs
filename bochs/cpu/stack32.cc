@@ -206,7 +206,7 @@ BX_CPU_C::POP_SS(BxInstruction_t *i)
 BX_CPU_C::PUSHAD32(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("PUSHAD: not supported on an 8086"));
+  BX_PANIC(("PUSHAD: not supported on an 8086\n"));
 #else
   Bit32u temp_ESP;
   Bit32u esp;
@@ -219,14 +219,14 @@ BX_CPU_C::PUSHAD32(BxInstruction_t *i)
 
     if (protected_mode()) {
       if ( !can_push(&BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache, temp_ESP, 32) ) {
-        BX_PANIC(("PUSHAD(): stack doesn't have enough room!"));
+        BX_PANIC(("PUSHAD(): stack doesn't have enough room!\n"));
         exception(BX_SS_EXCEPTION, 0, 0);
         return;
         }
       }
     else {
       if (temp_ESP < 32)
-        BX_PANIC(("pushad: eSP < 32"));
+        BX_PANIC(("pushad: eSP < 32\n"));
       }
 
     esp = ESP;
@@ -247,13 +247,13 @@ BX_CPU_C::PUSHAD32(BxInstruction_t *i)
 BX_CPU_C::POPAD32(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("POPAD not supported on an 8086"));
+  BX_PANIC(("POPAD not supported on an 8086\n"));
 #else /* 286+ */
     Bit32u edi, esi, ebp, etmp, ebx, edx, ecx, eax;
 
     if (protected_mode()) {
       if ( !can_pop(32) ) {
-        BX_PANIC(("pop_ad: not enough bytes on stack"));
+        BX_PANIC(("pop_ad: not enough bytes on stack\n"));
         exception(BX_SS_EXCEPTION, 0, 0);
         return;
         }
@@ -283,7 +283,7 @@ BX_CPU_C::POPAD32(BxInstruction_t *i)
 BX_CPU_C::PUSH_Id(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("PUSH_Iv: not supported on 8086!"));
+  BX_PANIC(("PUSH_Iv: not supported on 8086!\n"));
 #else
 
     Bit32u imm32;
@@ -316,7 +316,7 @@ BX_CPU_C::PUSH_Ed(BxInstruction_t *i)
 BX_CPU_C::ENTER_IwIb(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("ENTER_IwIb: not supported by 8086!"));
+  BX_PANIC(("ENTER_IwIb: not supported by 8086!\n"));
 #else
   Bit32u frame_ptr32;
   Bit16u frame_ptr16;
@@ -328,10 +328,10 @@ BX_CPU_C::ENTER_IwIb(BxInstruction_t *i)
 
   level %= 32;
 /* ??? */
-if (level) BX_PANIC(("enter(): level > 0"));
+if (level) BX_PANIC(("enter(): level > 0\n"));
 //if (BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.d_b && i->os_32==0) {
-//  BX_INFO(("enter(): stacksize!=opsize: I'm unsure of the code for this"));
-//  BX_PANIC(("         The Intel manuals are a mess on this one!"));
+//  BX_INFO(("enter(): stacksize!=opsize: I'm unsure of the code for this\n"));
+//  BX_PANIC(("         The Intel manuals are a mess on this one!\n"));
 //  }
 
   if ( protected_mode() ) {
@@ -354,7 +354,7 @@ if (level) BX_PANIC(("enter(): level > 0"));
     else
       temp_ESP = SP;
     if ( !can_push(&BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache, temp_ESP, bytes_to_push) ) {
-      BX_PANIC(("ENTER: not enough room on stack!"));
+      BX_PANIC(("ENTER: not enough room on stack!\n"));
       exception(BX_SS_EXCEPTION, 0, 0);
       }
     }
@@ -450,7 +450,7 @@ if (level) BX_PANIC(("enter(): level > 0"));
 BX_CPU_C::LEAVE(BxInstruction_t *i)
 {
 #if BX_CPU_LEVEL < 2
-  BX_PANIC(("LEAVE: not supported by 8086!"));
+  BX_PANIC(("LEAVE: not supported by 8086!\n"));
 #else
   Bit32u temp_EBP;
 
@@ -467,14 +467,14 @@ BX_CPU_C::LEAVE(BxInstruction_t *i)
   if ( protected_mode() ) {
     if (BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.c_ed) { /* expand up */
       if (temp_EBP <= BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit_scaled) {
-        BX_PANIC(("LEAVE: BP > BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].limit"));
+        BX_PANIC(("LEAVE: BP > BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].limit\n"));
         exception(BX_SS_EXCEPTION, 0, 0);
         return;
         }
       }
     else { /* normal */
       if (temp_EBP > BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit_scaled) {
-        BX_PANIC(("LEAVE: BP > BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].limit"));
+        BX_PANIC(("LEAVE: BP > BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].limit\n"));
         exception(BX_SS_EXCEPTION, 0, 0);
         return;
         }

@@ -33,68 +33,68 @@
 
 FILE *state_file::get_handle()
 {
-  BX_INFO(("state_file::get_handle()"));
+  BX_INFO(("state_file::get_handle()\n"));
   return NULL;
 }
 	
 void state_file::write(Bit8u)
 {
-  BX_PANIC(("state_file::write(Bit8u)"));
+  BX_PANIC(("state_file::write(Bit8u)\n"));
 }
 
 void state_file::write(Bit16u)
 {
-  BX_PANIC(("state_file::write(Bit16u)"));
+  BX_PANIC(("state_file::write(Bit16u)\n"));
 }
 
 void state_file::write(Bit32u)
 {
-  BX_PANIC(("state_file::write(Bit32u)"));
+  BX_PANIC(("state_file::write(Bit32u)\n"));
 }
 
 void state_file::write(Bit64u)
 {
-  BX_PANIC(("state_file::write(Bit64u)"));
+  BX_PANIC(("state_file::write(Bit64u)\n"));
 }
 
 void state_file::write(const void *, size_t)
 {
-  BX_PANIC(("state_file::write(const void *, size_t)"));
+  BX_PANIC(("state_file::write(const void *, size_t)\n"));
 }
 
 void state_file::read(Bit8u &)
 {
-  BX_PANIC(("state_file::read(uint8 &)"));
+  BX_PANIC(("state_file::read(uint8 &)\n"));
 }
 
 void state_file::read(Bit16u &)
 {
-  BX_PANIC(("state_file::read(uint16 &)"));
+  BX_PANIC(("state_file::read(uint16 &)\n"));
 }
 
 void state_file::read(Bit32u &)
 {
-  BX_PANIC(("state_file::read(uint32 &)"));
+  BX_PANIC(("state_file::read(uint32 &)\n"));
 }
 
 void state_file::read(Bit64u &)
 {
-  BX_PANIC(("state_file::read(uint64 &)"));
+  BX_PANIC(("state_file::read(uint64 &)\n"));
 }
 
 void state_file::read(void *, size_t)
 {
-  BX_PANIC(("state_file::read(void *, size_t)"));
+  BX_PANIC(("state_file::read(void *, size_t)\n"));
 }
 
 void state_file::write_check(const char *)
 {
-  BX_PANIC(("state_file::write_check()"));
+  BX_PANIC(("state_file::write_check()\n"));
 }
 
 void state_file::read_check (const char *)
 {
-  BX_PANIC(("state_file::read_check()"));
+  BX_PANIC(("state_file::read_check()\n"));
 }
 
 void
@@ -111,17 +111,17 @@ state_file::state_file (const char *name, const char *options)
   UNUSED(name);
   UNUSED(options);
   init();
-  BX_DEBUG(( "Init(const char *, const char *)." ));
+  BX_DEBUG(( "Init(const char *, const char *).\n" ));
 }
 
 state_file::state_file (FILE *f)
 {
   UNUSED(f);
   init();
-  BX_INFO(("Init(FILE *)."));
+  BX_INFO(("Init(FILE *).\n"));
 }
 
 state_file::~state_file()
 {
-  BX_DEBUG(("Exit."));
+  BX_DEBUG(("Exit.\n"));
 }
