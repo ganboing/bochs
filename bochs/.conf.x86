@@ -5,7 +5,7 @@
 #
 
 CC="egcs"
-CXX="c++"
+CXX="$CC"
 CFLAGS="-Wall -O2 -m486 -fomit-frame-pointer -pipe"
 CXXFLAGS="$CFLAGS"
 

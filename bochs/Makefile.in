@@ -45,7 +45,6 @@ GUI_LINK_OPTS_WIN32_VCPP = user32.lib gdi32.lib winmm.lib \
   comdlg32.lib comctl32.lib wsock32.lib
 GUI_LINK_OPTS_MACOS =
 GUI_LINK_OPTS_NOGUI =
-GUI_LINK_OPTS_TERM = @GUI_LINK_OPTS_TERM@
 GUI_LINK_OPTS = @GUI_LINK_OPTS@
 RANLIB = @RANLIB@
 
@@ -123,47 +122,47 @@ bochs@EXE@: @IODEV_LIB_VAR@ @DEBUGGER_VAR@ \
 $(BX_OBJS): $(BX_INCLUDES)
 
 
-iodev/libiodev.a::
+iodev/libiodev.a:
 	cd iodev @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libiodev.a
 	@CD_UP_ONE@
 
-debug/libdebug.a::
+debug/libdebug.a:
 	cd debug @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libdebug.a
 	@CD_UP_ONE@
 
-cpu/libcpu.a::
+cpu/libcpu.a:
 	cd cpu @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libcpu.a
 	@CD_UP_ONE@
 
-memory/libmemory.a::
+memory/libmemory.a:
 	cd memory @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libmemory.a
 	@CD_UP_ONE@
 
-gui/libgui.a::
+gui/libgui.a:
 	cd gui @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libgui.a
 	@CD_UP_ONE@
 
-disasm/libdisasm.a::
+disasm/libdisasm.a:
 	cd disasm @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libdisasm.a
 	@CD_UP_ONE@
 
-dynamic/libdynamic.a::
+dynamic/libdynamic.a:
 	cd dynamic @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libdynamic.a
 	@CD_UP_ONE@
 
-@INSTRUMENT_DIR@/libinstrument.a::
+@INSTRUMENT_DIR@/libinstrument.a:
 	cd @INSTRUMENT_DIR@ @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libinstrument.a
 	@CD_UP_TWO@
 
-fpu/libfpu.a::
+fpu/libfpu.a:
 	cd fpu @COMMAND_SEPARATOR@
 	$(MAKE) $(MDEFINES) libfpu.a
 	@CD_UP_ONE@
@@ -180,9 +179,7 @@ libbochs_cpu.a: @DEBUGGER_VAR@ $(BX_OBJS)
 
 clean:
 	@RMCOMMAND@ *.o
-	@RMCOMMAND@ */*.o
 	@RMCOMMAND@ *.a
-	@RMCOMMAND@ */*.a
 	@RMCOMMAND@ bochs@EXE@
 	@RMCOMMAND@ bochs.out
 

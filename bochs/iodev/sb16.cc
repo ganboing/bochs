@@ -24,7 +24,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS bx_sb16.
 
 // some shortcuts to save typing
 #define LOGFILE         BX_SB16_THIS logfile
@@ -41,15 +40,14 @@
 
 #define BX_SB16_OUTPUT  BX_SB16_THIS output
 
-bx_sb16_c bx_sb16;
 #if BX_USE_SB16_SMF
-#define this ((void *)&bx_sb16)
+bx_sb16_c bx_sb16;
+#define this NULL
 #endif
 
 bx_sb16_c::bx_sb16_c(void)
 {
-  setprefix("[SB16]");
-  settype(SB16LOG);
+  // nothing for now
 }
 
 bx_sb16_c::~bx_sb16_c(void)
@@ -106,7 +104,7 @@ void bx_sb16_c::init(bx_devices_c *d)
       LOGFILE = fopen(bx_options.sb16.logfile,"w"); // logfile for errors etc.
       if (LOGFILE == NULL)
 	{
-	  BX_ERROR(("Error opening file %s. Logging disabled.", bx_options.sb16.logfile));
+	  bx_printf("#SB16: Error opening file %s. Logging disabled.", bx_options.sb16.logfile);
 	  bx_options.sb16.loglevel = 0;
 	}
     }
@@ -158,11 +156,11 @@ void bx_sb16_c::init(bx_devices_c *d)
       bx_options.sb16.wavemode = 0;
     }
 
-  BX_INFO(("midi=%d,%s  wave=%d,%s  log=%d,%s  dmatimer=%d\n",
+  bx_printf("#SB16 options: midi=%d,%s  wave=%d,%s  log=%d,%s  dmatimer=%d\n",
 	    bx_options.sb16.midimode, bx_options.sb16.midifile,
 	    bx_options.sb16.wavemode, bx_options.sb16.wavefile,
 	    bx_options.sb16.loglevel, bx_options.sb16.logfile,
-	    bx_options.sb16.dmatimer));
+	    bx_options.sb16.dmatimer);
 
   // allocate the FIFO buffers - except for the MPUMIDICMD buffer
   // these sizes are generous, 16 or 8 would probably be sufficient
@@ -202,15 +200,15 @@ void bx_sb16_c::init(bx_devices_c *d)
   // Allocate the IO addresses, 2x0..2xf, 3x0..3x4 and 388..38b
   for (addr=BX_SB16_IO; addr<BX_SB16_IO+BX_SB16_IOLEN; addr++) {
     BX_SB16_THIS devices->register_io_read_handler(this,
-       &read_handler, addr, "SB16");
+       read_handler, addr, "SB16");
     BX_SB16_THIS devices->register_io_write_handler(this,
-       &write_handler, addr, "SB16");
+       write_handler, addr, "SB16");
     }
   for (addr=BX_SB16_IOMPU; addr<BX_SB16_IOMPU+BX_SB16_IOMPULEN; addr++) {
     BX_SB16_THIS devices->register_io_read_handler(this,
-       &read_handler, addr, "SB16");
+       read_handler, addr, "SB16");
     BX_SB16_THIS devices->register_io_write_handler(this,
-       &write_handler, addr, "SB16");
+       write_handler, addr, "SB16");
     }
   /* Uncomment this if you know the consequences...
   for (addr=BX_SB16_IOADLIB; addr<BX_SB16_IOADLIB+BX_SB16_IOADLIBLEN; addr++) {
@@ -3136,8 +3134,8 @@ void bx_sb16_c::writelog(int loglevel, const char *str, ...)
     {
 	time_t timep = time(NULL);
 	tm *t = localtime(&timep);
-	BX_INFO(( "SB16 %02d:%02d:%02d (%i): ",
-		t->tm_hour, t->tm_min, t->tm_sec, loglevel ));
+	fprintf(LOGFILE, "SB16 %02d:%02d:%02d (%i): ",
+		t->tm_hour, t->tm_min, t->tm_sec, loglevel);
 	va_list ap;
 	va_start(ap, str);
 	vfprintf(LOGFILE, str, ap);
@@ -3229,7 +3227,7 @@ Boolean bx_sb16_buffer::puts(char *data, ...)
   va_end(ap);
 
   if ( (int) strlen(string) >= length)
-    BX_PANIC(("bx_sb16_buffer: puts() too long!\n"));
+    bx_panic("bx_sb16_buffer: puts() too long!\n");
 
   while (string[index] != 0)
     {

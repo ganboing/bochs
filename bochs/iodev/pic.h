@@ -58,7 +58,7 @@ typedef struct {
   } bx_pic_t;
 
 
-class bx_pic_c : public logfunctions {
+class bx_pic_c {
 
 public:
   bx_pic_c(void);
@@ -88,4 +88,6 @@ private:
   BX_PIC_SMF void   show_pic_state(void);
   };
 
+#if BX_USE_PIC_SMF
 extern bx_pic_c bx_pic;
+#endif

@@ -30,7 +30,7 @@
 #else
 #  define BX_SB16_SMF
 #  define BX_SB16_THIS  this->
-#  define BX_SB16_THISP (this)
+#  define BX_SB16_THISU (this)
 #endif
 
 #if BX_USE_SOUND_VIRTUAL
@@ -55,10 +55,10 @@
 #define BX_SB16_IOMPULEN 4          // number of addresses covered
 #define BX_SB16_IOADLIB 0x388       // equivalent to 0x220..0x223 and 0x228..0x229
 #define BX_SB16_IOADLIBLEN 4        // number of addresses covered
-#define BX_SB16_IRQ     bx_sb16.currentirq
+#define BX_SB16_IRQ     BX_SB16_THIS currentirq
 #define BX_SB16_IRQMPU  BX_SB16_IRQ // IRQ for the MPU401 part - same value
-#define BX_SB16_DMAL    bx_sb16.currentdma8
-#define BX_SB16_DMAH    bx_sb16.currentdma16
+#define BX_SB16_DMAL    BX_SB16_THIS currentdma8
+#define BX_SB16_DMAH    BX_SB16_THIS currentdma16
 
 /*
    A few notes:
@@ -185,7 +185,7 @@ private:
 class BX_SOUND_OUTPUT_C_DEF;
 
 // The actual emulator class, emulating the sound blaster ports
-class bx_sb16_c : public logfunctions {
+class bx_sb16_c {
 public:
 
   bx_sb16_c(void);
@@ -306,7 +306,7 @@ private:
   BX_SB16_SMF Bit32u mpu_dataread();                 // read data port     3x0
   BX_SB16_SMF void   mpu_datawrite(Bit32u value);    // write data port    3x0
   BX_SB16_SMF void   mpu_mididata(Bit32u value);     // get a midi byte
-  static void   mpu_timer (void *);
+  BX_SB16_SMF void   mpu_timer (void *);
 
       /* The DSP part */
   BX_SB16_SMF void   dsp_reset(Bit32u value);        // write to reset port 2x6
@@ -324,7 +324,7 @@ private:
   BX_SB16_SMF void   dsp_dmadone();		     // stop a DMA transfer
   BX_SB16_SMF void   dsp_enabledma();		     // enable the transfer
   BX_SB16_SMF void   dsp_disabledma();		     // temporarily disable DMA
-  static void   dsp_dmatimer (void *);
+  BX_SB16_SMF void   dsp_dmatimer (void *);
 
       /* The mixer part */
   BX_SB16_SMF Bit32u mixer_readdata(void);
@@ -341,7 +341,7 @@ private:
   BX_SB16_SMF Bit32u opl_status(int chipid);
   BX_SB16_SMF void   opl_index(Bit32u value, int chipid);
   BX_SB16_SMF void   opl_data(Bit32u value, int chipid);
-  static void   opl_timer(void *);
+  BX_SB16_SMF void   opl_timer(void *);
   BX_SB16_SMF void   opl_changeop(int channum, int opernum, int byte, int value);
   BX_SB16_SMF void   opl_settimermask(int value, int chipid);
   BX_SB16_SMF void   opl_set4opmode(int new4opmode);
@@ -370,8 +370,8 @@ private:
 
       /* The port IO multiplexer functions */
 
-  static Bit32u read_handler(void *this_ptr, Bit32u address, unsigned io_len);
-  static void   write_handler(void *this_ptr, Bit32u address, Bit32u value, unsigned io_len);
+  BX_SB16_SMF Bit32u read_handler(void *this_ptr, Bit32u address, unsigned io_len);
+  BX_SB16_SMF void   write_handler(void *this_ptr, Bit32u address, Bit32u value, unsigned io_len);
 
 #if !BX_USE_SB16_SMF
   Bit32u read(Bit32u address, unsigned io_len);
@@ -380,7 +380,7 @@ private:
 };
 
 // The class with the output functions
-class bx_sound_output_c : public logfunctions {
+class bx_sound_output_c {
 public:
 
       /* These functions are the sound output functions, sending
@@ -405,7 +405,9 @@ public:
   BX_SOUND_VIRTUAL int    closewaveoutput();
 };
 
+#if BX_USE_SB16_SMF
 extern bx_sb16_c bx_sb16;
+#endif
 
 #include "soundlnx.h"
 #include "soundwin.h"

@@ -34,7 +34,7 @@
 
 
 
-class BX_MEM_C : public logfunctions {
+class BX_MEM_C {
 
 public:
   Bit8u   *vector;

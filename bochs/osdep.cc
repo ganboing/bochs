@@ -38,7 +38,6 @@
 //////////////////////////////////////////////////////////////////////
 
 #if !BX_HAVE_SNPRINTF
-/* XXX use real snprintf */
 /* if they don't have snprintf, just use sprintf */
 int bx_snprintf (char *s, size_t maxlen, const char *format, ...)
 {
@@ -200,7 +199,6 @@ int main (int argc, char **argv)
 #endif  /* BX_TEST_STRTOULL_MAIN */
 
 #if !BX_HAVE_STRDUP
-/* XXX use real strdup */
 char *bx_strdup(const char *str)
 {
 	char *temp;

@@ -56,7 +56,7 @@ typedef struct {
 
 
 
-class bx_pit_c : public logfunctions {
+class bx_pit_c {
 public:
   bx_pit_c( void );
   ~bx_pit_c( void );
@@ -91,6 +91,8 @@ private:
   BX_PIT_SMF void  start(unsigned timerid);
   };
 
+#if BX_USE_PIT_SMF
 extern bx_pit_c bx_pit;
+#endif
 
 #endif  // #ifndef _BX_PIT_H

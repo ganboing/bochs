@@ -33,7 +33,7 @@
 #endif
 
 
-class bx_cmos_c : public logfunctions {
+class bx_cmos_c {
 public:
   bx_cmos_c(void);
   ~bx_cmos_c(void);
@@ -71,4 +71,6 @@ private:
   };
 
 
+#if BX_USE_CMOS_SMF
 extern bx_cmos_c bx_cmos;
+#endif

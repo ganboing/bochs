@@ -24,7 +24,6 @@
 
 
 #include "bochs.h"
-#define LOG_THIS genlog->
 
 
 
@@ -46,7 +45,7 @@ bx_load32bitOSimagehack(void)
   fp = fopen(bx_options.load32bitOSImage.iolog, "r");
 
   if (fp == NULL) {
-    BX_PANIC(("could not open IO init file.\n"));
+    bx_panic("could not open IO init file.\n");
     }
 
   while (1) {
@@ -55,7 +54,7 @@ bx_load32bitOSimagehack(void)
     ret = fscanf(fp, "%u %u %x %x\n",
       &len, &op, &port, &val);
     if (ret != 4) {
-      BX_PANIC(("could not open IO init file.\n"));
+      bx_panic("could not open IO init file.\n");
       }
     if (op == 0) {
       // read
@@ -66,7 +65,7 @@ bx_load32bitOSimagehack(void)
       bx_devices.outp(port, val, len);
       }
     else {
-      BX_PANIC(("bad IO op in init filen"));
+      bx_panic("bad IO op in init filen");
       }
     if (feof(fp)) break;
     }
@@ -80,7 +79,7 @@ bx_load32bitOSimagehack(void)
       bx_load_null_kernel_hack();
       break;
     default:
-      BX_PANIC(("load32bitOSImage: OS not recognized\n"));
+      bx_panic("load32bitOSImage: OS not recognized\n");
     }
 }
 
@@ -262,12 +261,12 @@ bx_load_kernel_image(char *path, Bit32u paddr)
 #endif
            );
   if (fd < 0) {
-    BX_INFO(( "load_kernel_image: couldn't open image file '%s'.\n", path ));
+    fprintf(stderr, "load_kernel_image: couldn't open image file '%s'.\n", path);
     exit(1);
     }
   ret = fstat(fd, &stat_buf);
   if (ret) {
-    BX_INFO(( "load_kernel_image: couldn't stat image file '%s'.\n", path ));
+    fprintf(stderr, "load_kernel_image: couldn't stat image file '%s'.\n", path);
     exit(1);
     }
 
@@ -275,7 +274,7 @@ bx_load_kernel_image(char *path, Bit32u paddr)
   page_size = ((Bit32u)size + 0xfff) & ~0xfff;
 
   if ( (paddr + size) > BX_MEM_THIS len ) {
-    BX_INFO(( "load_kernel_image: address range > physical memsize!\n" ));
+    fprintf(stderr, "load_kernel_image: address range > physical memsize!\n");
     exit(1);
     }
 
@@ -283,17 +282,17 @@ bx_load_kernel_image(char *path, Bit32u paddr)
   while (size > 0) {
     ret = read(fd, (bx_ptr_t) &BX_MEM_THIS vector[paddr + offset], size);
     if (ret <= 0) {
-      BX_INFO(( "load_kernel_image: read failed on image\n" ));
+      fprintf(stderr, "load_kernel_image: read failed on image\n");
       exit(1);
       }
     size -= ret;
     offset += ret;
     }
   close(fd);
-  BX_INFO(( "#(%u) load_kernel_image: '%s', size=%u read into memory at %08x\n",
+  fprintf(stderr, "#(%u) load_kernel_image: '%s', size=%u read into memory at %08x\n",
           BX_SIM_ID, path,
           (unsigned) stat_buf.st_size,
-          (unsigned) paddr ));
+          (unsigned) paddr);
 
   return page_size;
 }
