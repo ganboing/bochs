@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: harddrv.cc,v 1.94 2003-01-05 03:22:03 cbothamy Exp $
+// $Id: harddrv.cc,v 1.92 2002-12-12 18:30:03 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -175,7 +175,7 @@ bx_hard_drive_c::init(void)
   Bit8u channel;
   char  string[5];
 
-  BX_DEBUG(("Init $Id: harddrv.cc,v 1.94 2003-01-05 03:22:03 cbothamy Exp $"));
+  BX_DEBUG(("Init $Id: harddrv.cc,v 1.92 2002-12-12 18:30:03 bdenney Exp $"));
 
   for (channel=0; channel<BX_MAX_ATA_CHANNEL; channel++) {
     if (bx_options.ata[channel].Opresent->get() == 1) {
@@ -1396,8 +1396,7 @@ if ( quantumsMax == 0)
 							      BX_SELECTED_CONTROLLER(channel).buffer[9] = 0x12;
 							      BX_SELECTED_CONTROLLER(channel).buffer[10] = 0x00;
 							      BX_SELECTED_CONTROLLER(channel).buffer[11] = 0x00;
-							      // Multisession, Mode 2 Form 2, Mode 2 Form 1
-							      BX_SELECTED_CONTROLLER(channel).buffer[12] = 0x70; 
+							      BX_SELECTED_CONTROLLER(channel).buffer[12] = 0x00;
 							      BX_SELECTED_CONTROLLER(channel).buffer[13] = (3 << 5);
 							      BX_SELECTED_CONTROLLER(channel).buffer[14] = (unsigned char)
 (1 |
@@ -1628,16 +1627,8 @@ if ( quantumsMax == 0)
 			      }
 			      break;
 
-			      case 0x28: // read (10)
-			      case 0xa8: // read (12)
-			                 { 
-
-				    uint32 transfer_length;
-				    if (atapi_command == 0x28)
-				          transfer_length = read_16bit(BX_SELECTED_CONTROLLER(channel).buffer + 7);
-				    else
-				          transfer_length = read_32bit(BX_SELECTED_CONTROLLER(channel).buffer + 6);
-
+			      case 0x28: { // read (10)
+				    uint32 transfer_length = read_16bit(BX_SELECTED_CONTROLLER(channel).buffer + 7);
 				    uint32 lba = read_32bit(BX_SELECTED_CONTROLLER(channel).buffer + 2);
 
 				    if (!BX_SELECTED_DRIVE(channel).cdrom.ready) {
@@ -1649,7 +1640,7 @@ if ( quantumsMax == 0)
 				    if (transfer_length == 0) {
 					  atapi_cmd_nop(channel);
 					  raise_interrupt(channel);
-					  BX_INFO(("READ(%d) with transfer length 0, ok", atapi_command==0x28?10:12));
+					  BX_INFO(("READ(10) with transfer length 0, ok"));
 					  break;
 				    }
 
@@ -1659,7 +1650,7 @@ if ( quantumsMax == 0)
 					  break;
 				    }
 
-				    BX_DEBUG(("cdrom: READ (%d) LBA=%d LEN=%d", atapi_command==0x28?10:12, lba, transfer_length));
+				    //BX_INFO(("cdrom: READ LBA=%d LEN=%d", lba, transfer_length));
 
 				    // handle command
 				    init_send_atapi_command(channel, atapi_command, transfer_length * 2048,
@@ -1741,6 +1732,7 @@ if ( quantumsMax == 0)
 			      }
 			      break;
 
+			      case 0xa8: // read (12)
 			      case 0x55: // mode select
 			      case 0xa6: // load/unload cd
 			      case 0x4b: // pause/resume

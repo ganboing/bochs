@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: protect_ctrl.cc,v 1.23 2003-01-17 18:08:13 cbothamy Exp $
+// $Id: protect_ctrl.cc,v 1.22 2002-10-25 18:26:29 sshwarts Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -737,8 +737,7 @@ BX_CPU_C::SGDT_Ms(bxInstruction_c *i)
   Bit16u limit_16;
   Bit32u base_32;
 
-  // ams says it works ok in v8086 mode
-  // if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported"));
+  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported"));
 
 
   /* op1 is a register or memory reference */
@@ -787,8 +786,7 @@ BX_CPU_C::SIDT_Ms(bxInstruction_c *i)
   Bit16u limit_16;
   Bit32u base_32;
 
-  // ams says it works ok in v8086 mode
-  // if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported"));
+  if (v8086_mode()) BX_PANIC(("protect_ctrl: v8086 mode unsupported"));
 
   /* op1 is a register or memory reference */
   if (i->modC0()) {

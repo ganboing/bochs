@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: vga.h,v 1.22 2003-01-11 11:18:04 vruppert Exp $
+// $Id: vga.h,v 1.20.2.1 2003-01-03 00:29:33 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -176,7 +176,6 @@ private:
       Bit8u write_data_cycle; /* 0, 1, 2 */
       Bit8u read_data_register;
       Bit8u read_data_cycle; /* 0, 1, 2 */
-      Bit8u dac_state;
       struct {
         Bit8u red;
         Bit8u green;

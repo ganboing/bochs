@@ -86,8 +86,6 @@ BX_CPU_C::fpu_execute(bxInstruction_c *i)
   fpu_cpu_ptr = this;
   current_i387 = &(BX_CPU_THIS_PTR the_i387);
 
-  is_32 = BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b;
-
 #if 0
   addr_modes.default_mode = VM86;
   addr_modes.default_mode = 0; // FPU_CS == __USER_CS && FPU_DS == __USER_DS
@@ -95,8 +93,7 @@ BX_CPU_C::fpu_execute(bxInstruction_c *i)
   addr_modes.default_mode = PM16;
 #endif
   if (protected_mode()) {
-    if (is_32) addr_modes.default_mode = SEG32;
-    else addr_modes.default_mode = PM16;
+    addr_modes.default_mode = SEG32;
     }
   else if (v8086_mode()) {
     addr_modes.default_mode = VM86;
@@ -110,6 +107,7 @@ BX_CPU_C::fpu_execute(bxInstruction_c *i)
   // Mark if instruction used opsize or addrsize prefixes
   // Actually, addr_modes.override.address_size is not used,
   // could delete that code.
+  is_32 = BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b;
   if (i->as32B() == is_32)
     addr_modes.override.address_size = 0;
   else
@@ -277,10 +275,7 @@ math_abort(struct info *info, unsigned int signal)
     case SIGFPE:
       if (fpu_cpu_ptr->cr0.ne == 0) {
         // MSDOS compatibility external interrupt (IRQ13)
-        BX_INFO (("math_abort: MSDOS compatibility FPU exception"));
-
-        DEV_pic_raise_irq(13);
-        return;
+        BX_PANIC (("math_abort: MSDOS compatibility not supported yet"));
         }
       fpu_cpu_ptr->exception(BX_MF_EXCEPTION, 0, 0);
       // execution does not reach here

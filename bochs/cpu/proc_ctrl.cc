@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: proc_ctrl.cc,v 1.66 2003-01-20 20:10:31 cbothamy Exp $
+// $Id: proc_ctrl.cc,v 1.63 2002-11-13 21:00:04 sshwarts Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -1334,95 +1334,6 @@ BX_PANIC(("LOADALL: handle CR0.val32"));
 #endif
 }
 
-/* Get CPU feature flags. Returned by CPUID functions 1 and 80000001.  */
-  static inline Bit32u
-get_std_cpuid_features()
-{
-  unsigned features;
-
-      // EAX[3:0]   Stepping ID
-      // EAX[7:4]   Model: starts at 1
-      // EAX[11:8]  Family: 4=486, 5=Pentium, 6=PPro
-      // EAX[13:12] Type: 0=OEM,1=overdrive,2=dual cpu,3=reserved
-      // EAX[31:14] Reserved
-      // EBX:       Reserved (0)
-      // ECX:       Reserved (0)
-      // EDX:       Feature Flags
-      //   [0:0]   FPU on chip
-      //   [1:1]   VME: Virtual-8086 Mode enhancements
-      //   [2:2]   DE: Debug Extensions (I/O breakpoints)
-      //   [3:3]   PSE: Page Size Extensions
-      //   [4:4]   TSC: Time Stamp Counter
-      //   [5:5]   MSR: RDMSR and WRMSR support
-      //   [6:6]   PAE: Physical Address Extensions
-      //   [7:7]   MCE: Machine Check Exception
-      //   [8:8]   CXS: CMPXCHG8B instruction
-      //   [9:9]   APIC: APIC on Chip
-      //   [10:10] Reserved
-      //   [11:11] SYSENTER/SYSEXIT support
-      //   [12:12] MTRR: Memory Type Range Reg
-      //   [13:13] PGE/PTE Global Bit
-      //   [14:14] MCA: Machine Check Architecture
-      //   [15:15] CMOV: Cond Mov/Cmp Instructions
-      //   [22:16] Reserved
-      //   [23:23] MMX Technology
-      //   [24]    FXSR: FSAVE/FXRSTOR (also indicates CR4.OSFXSR is available)
-      //   [25]    SSE: SSE Extensions
-      //   [26]    SSE2: SSE2 Extensions
-      //   [28]    Reserved
-      //   [29]    TM: Therm Monitor
-      //   [31:30] Reserved
-
-      features = 0; // start with none
-
-#  if BX_SUPPORT_FPU
-      features |= 0x01;
-#  endif
-
-#if (BX_CPU_LEVEL >= 5)
-  features |= (1<<8);   // Support CMPXCHG8B instruction
-      features |= (1<<4);   // implement TSC
-#  if BX_SUPPORT_MMX
-      features |= (1<<23);  // support MMX
-#  endif
-#endif
-
-#if BX_CPU_LEVEL == 6
-      features |= (1<<15);  // Implement CMOV instructions.
-#  if BX_SUPPORT_APIC
-      features |= (1<<9);   // APIC on chip
-#  endif
-#  if BX_SUPPORT_SSE >= 1
-      features |= (1<<24);  // support FSAVE/FXRSTOR
-      features |= (1<<25);  // support SSE
-#  endif
-#  if BX_SUPPORT_SSE >= 2
-      features |= (1<<26);  // support SSE2
-#  endif
-#endif
-
-#if BX_SUPPORT_4MEG_PAGES
-      features |= (1<<3);   // Support Page-Size Extension (4M pages)
-#endif
-
-#if BX_SupportGlobalPages
-      features |= (1<<13);  // Support Global pages.
-#endif
-
-#if BX_SupportPAE
-      features |= (1<<6);   // Support PAE.
-#endif
-
-#if BX_SUPPORT_X86_64
-  features |= (1<<5);       // AMD specific MSR's
-#endif
-
-#if BX_SUPPORT_SEP
-  features |= (1<<11);      // SYSENTER/SYSEXIT
-#endif
-
-  return features;
-}
 
   void
 BX_CPU_C::CPUID(bxInstruction_c *i)
@@ -1453,39 +1364,117 @@ BX_CPU_C::CPUID(bxInstruction_c *i)
       break;
 
     case 1:
+      // EAX[3:0]   Stepping ID
+      // EAX[7:4]   Model: starts at 1
+      // EAX[11:8]  Family: 4=486, 5=Pentium, 6=PPro
+      // EAX[13:12] Type: 0=OEM,1=overdrive,2=dual cpu,3=reserved
+      // EAX[31:14] Reserved
+      // EBX:       Reserved (0)
+      // ECX:       Reserved (0)
+      // EDX:       Feature Flags
+      //   [0:0]   FPU on chip
+      //   [1:1]   VME: Virtual-8086 Mode enhancements
+      //   [2:2]   DE: Debug Extensions (I/O breakpoints)
+      //   [3:3]   PSE: Page Size Extensions
+      //   [4:4]   TSC: Time Stamp Counter
+      //   [5:5]   MSR: RDMSR and WRMSR support
+      //   [6:6]   PAE: Physical Address Extensions
+      //   [7:7]   MCE: Machine Check Exception
+      //   [8:8]   CXS: CMPXCHG8B instruction
+      //   [9:9]   APIC: APIC on Chip
+      //   [11:10] Reserved
+      //   [12:12] MTRR: Memory Type Range Reg
+      //   [13:13] PGE/PTE Global Bit
+      //   [14:14] MCA: Machine Check Architecture
+      //   [15:15] CMOV: Cond Mov/Cmp Instructions
+      //   [22:16] Reserved
+      //   [23:23] MMX Technology
+      //   [24]    FXSR: FSAVE/FXRSTOR (also indicates CR4.OSFXSR is available)
+      //   [25]    SSE: SSE Extensions
+      //   [26]    SSE2: SSE2 Extensions
+      //   [28]    Reserved
+      //   [29]    TM: Therm Monitor
+      //   [31:30] Reserved
+
+      features = 0; // start with none
+      type = 0; // OEM
 
 #if BX_CPU_LEVEL == 4
-  family = 4;
+      family = 4;
 #  if BX_SUPPORT_FPU
-  // 486dx
-  model = 1;
-  stepping = 3;
+      // 486dx
+      model = 1;
+      stepping = 3;
+      features |= 0x01;
 #  else
-  // 486sx
-  model = 2;
-  stepping = 3;
+      // 486sx
+      model = 2;
+      stepping = 3;
 #  endif
 
 #elif BX_CPU_LEVEL == 5
-  family = 5;
-  model = 1; // Pentium (60,66)
-  stepping = 3; // ???
+      family = 5;
+      model = 1; // Pentium (60,66)
+      stepping = 3; // ???
+      features |= (1<<4);   // implement TSC
+#  if BX_SUPPORT_FPU
+      features |= 0x01;
+#  endif
+#  if BX_SUPPORT_MMX
+      features |= (1<<23);  // support MMX
+#  endif
 
 #elif BX_CPU_LEVEL == 6
-  family = 6;
+      family = 6;
 #if BX_SUPPORT_X86_64
-  model = 2; // Hammer returns what?
+      model = 2; // Hammer returns what?
 #else
-  model = 1; // Pentium Pro
+      model = 1; // Pentium Pro
 #endif
-  stepping = 3; // ???
+      stepping = 3; // ???
+      features |= (1<<4);   // implement TSC
+      features |= (1<<15);  // Implement CMOV instructions.
+#  if BX_SUPPORT_APIC
+      features |= (1<<9);   // APIC on chip
+#  endif
+#  if BX_SUPPORT_FPU
+      features |= 0x01;     // support FPU
+#  endif
+#  if BX_SUPPORT_MMX
+      features |= (1<<23);  // support MMX
+#  endif
+#  if BX_SUPPORT_SSE >= 1
+      features |= (1<<24);  // support FSAVE/FXRSTOR
+      features |= (1<<25);  // support SSE
+#  endif
+#  if BX_SUPPORT_SSE >= 2
+      features |= (1<<26);  // support SSE2
+#  endif
+
 #else
-  BX_PANIC(("CPUID: not implemented for > 6"));
+      BX_PANIC(("CPUID: not implemented for > 6"));
 #endif
+
+#if BX_SUPPORT_4MEG_PAGES
+      features |= (1<<3);   // Support Page-Size Extension (4M pages)
+#endif
+
+#if BX_SupportGlobalPages
+      features |= (1<<13);  // Support Global pages.
+#endif
+
+#if BX_SupportPAE
+      features |= (1<<6);   // Support PAE.
+#endif
+
+#if (BX_CPU_LEVEL >= 5)
+      features |= (1<<8);   // Support CMPXCHG8B instruction
+#endif
+
 
       RAX = (family <<8) | (model<<4) | stepping;
       RBX = RCX = 0; // reserved
-      RDX = get_std_cpuid_features ();
+      RDX = features;
       break;
 
 #if BX_SUPPORT_X86_64
@@ -1500,21 +1489,8 @@ BX_CPU_C::CPUID(bxInstruction_c *i)
 
     case 0x80000001:
       // long mode supported.
-      features = get_std_cpuid_features ();
-      RAX = features;
-      // Many of the bits in EDX are the same as EAX
-      // [10:10] Reserved
-      // [11:11] SYSCALL and SYSRET instructions
-      // [18:19] Reserved
-      // [20:20] No-Execute page protection
-      // [21:21] Reserved
-      // [22:22] AMD MMX Extensions
-      // [25:28] Reserved
-      // [29:29] Long Mode
-      // [30:30] AMD 3DNow Extensions
-      // [31:31] AMD 3DNow Intructions
-      features = features & 0x0183F3FF;
-      RDX = features | (1 << 29) | (1 << 11);
+      // bug in manual - should be EDX not EAX
+      RDX = (1 << 29);
       RAX = RBX = RCX = 0;
       break;
 
@@ -1600,7 +1576,7 @@ BX_CPU_C::SetCR0(Bit32u val_32)
       BX_CPU_THIS_PTR msr.lma = 1;
       BX_CPU_THIS_PTR cpu_mode = BX_MODE_LONG_COMPAT;
 #if BX_EXTERNAL_DEBUGGER
-      //trap_debugger(0);
+      trap_debugger(0);
 #endif
       }
     }
@@ -1612,7 +1588,7 @@ BX_CPU_C::SetCR0(Bit32u val_32)
       BX_CPU_THIS_PTR msr.lma = 0;
       BX_CPU_THIS_PTR cpu_mode = BX_MODE_IA32;
 #if BX_EXTERNAL_DEBUGGER
-      //trap_debugger(0);
+      trap_debugger(0);
 #endif
       }
     }
@@ -1737,13 +1713,6 @@ BX_CPU_C::RDMSR(bxInstruction_c *i)
 
   /* We have the requested MSR register in ECX */
   switch(ECX) {
-
-#if BX_SUPPORT_SEP
-    case BX_MSR_SYSENTER_CS:  { EAX = BX_CPU_THIS_PTR sysenter_cs_msr;  EDX = 0; return; }
-    case BX_MSR_SYSENTER_ESP: { EAX = BX_CPU_THIS_PTR sysenter_esp_msr; EDX = 0; return; }
-    case BX_MSR_SYSENTER_EIP: { EAX = BX_CPU_THIS_PTR sysenter_eip_msr; EDX = 0; return; }
-#endif 
-
 #if BX_CPU_LEVEL == 5
     /* The following registers are defined for Pentium only */
     case BX_MSR_P5_MC_ADDR:
@@ -1869,17 +1838,6 @@ BX_CPU_C::WRMSR(bxInstruction_c *i)
 
   /* ECX has the MSR to write to */
   switch(ECX) {
-
-#if BX_SUPPORT_SEP
-    case BX_MSR_SYSENTER_CS:  {
-      if (EAX & 3) BX_PANIC (("writing sysenter_cs_msr with non-kernel mode selector %X", EAX));  // not a bug according to book
-      BX_CPU_THIS_PTR sysenter_cs_msr  = EAX;                                                     // ... but very stOOpid
-      return;
-    }
-    case BX_MSR_SYSENTER_ESP: { BX_CPU_THIS_PTR sysenter_esp_msr = EAX; return; }
-    case BX_MSR_SYSENTER_EIP: { BX_CPU_THIS_PTR sysenter_eip_msr = EAX; return; }
-#endif
-
 #if BX_CPU_LEVEL == 5
     /* The following registers are defined for Pentium only */
     case BX_MSR_P5_MC_ADDR:
@@ -1966,127 +1924,6 @@ BX_CPU_C::WRMSR(bxInstruction_c *i)
 do_exception:
   exception(BX_GP_EXCEPTION, 0, 0);
 
-}
-
-  void 
-BX_CPU_C::SYSENTER (bxInstruction_c *i)
-{
-#if BX_SUPPORT_SEP
-  if (!protected_mode ()) {
-    BX_INFO (("sysenter not from protected mode"));
-    exception (BX_GP_EXCEPTION, 0, 0);
-    return;
-  }
-  if (BX_CPU_THIS_PTR sysenter_cs_msr == 0) {
-    BX_INFO (("sysenter with zero sysenter_cs_msr"));
-    exception (BX_GP_EXCEPTION, 0, 0);
-    return;
-  }
-
-  invalidate_prefetch_q ();
-
-  BX_CPU_THIS_PTR set_VM(0);           // do this just like the book says to do
-  BX_CPU_THIS_PTR set_IF(0);
-  BX_CPU_THIS_PTR set_RF(0);
-
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.value = BX_CPU_THIS_PTR sysenter_cs_msr;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.index = BX_CPU_THIS_PTR sysenter_cs_msr >> 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.ti    = (BX_CPU_THIS_PTR sysenter_cs_msr >> 2) & 1;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.rpl   = 0;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.executable   = 1;          // code segment
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.c_ed         = 0;          // non-conforming
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.r_w          = 1;          // readable
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.a            = 1;          // accessed
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.base         = 0;          // base address
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.limit        = 0xFFFF;     // segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.limit_scaled = 0xFFFFFFFF; // scaled segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.g            = 1;          // 4k granularity
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b          = 1;          // 32-bit mode
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.avl          = 0;          // available for use by system
-
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.value = BX_CPU_THIS_PTR sysenter_cs_msr + 8;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.index = (BX_CPU_THIS_PTR sysenter_cs_msr + 8) >> 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.ti    = (BX_CPU_THIS_PTR sysenter_cs_msr >> 2) & 1;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.rpl   = 0;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.executable   = 0;          // data segment
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.c_ed         = 0;          // expand-up
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.r_w          = 1;          // writeable
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.a            = 1;          // accessed
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.base         = 0;          // base address
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit        = 0xFFFF;     // segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit_scaled = 0xFFFFFFFF; // scaled segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.g            = 1;          // 4k granularity
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.d_b          = 1;          // 32-bit mode
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.avl          = 0;          // available for use by system
-
-  // BX_INFO (("sysenter: old eip %X, esp %x, new eip %x, esp %X, edx %X", BX_CPU_THIS_PTR prev_eip, ESP, BX_CPU_THIS_PTR sysenter_eip_msr, BX_CPU_THIS_PTR sysenter_esp_msr, EDX));
-
-  ESP = BX_CPU_THIS_PTR sysenter_esp_msr;
-  EIP = BX_CPU_THIS_PTR sysenter_eip_msr;
-#else
-  UndefinedOpcode (i);
-#endif
-}
-
-  void 
-BX_CPU_C::SYSEXIT (bxInstruction_c *i)
-{
-#if BX_SUPPORT_SEP
-  if (!protected_mode ()) {
-    BX_INFO (("sysexit not from protected mode"));
-    exception (BX_GP_EXCEPTION, 0, 0);
-    return;
-  }
-  if (BX_CPU_THIS_PTR sysenter_cs_msr == 0) {
-    BX_INFO (("sysexit with zero sysenter_cs_msr"));
-    exception (BX_GP_EXCEPTION, 0, 0);
-    return;
-  }
-  if (CPL != 0) {
-    BX_INFO (("sysexit at non-zero cpl %u", CPL));
-    exception (BX_GP_EXCEPTION, 0, 0);
-    return;
-  }
-
-  invalidate_prefetch_q ();
-
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.value = (BX_CPU_THIS_PTR sysenter_cs_msr + 16) | 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.index = (BX_CPU_THIS_PTR sysenter_cs_msr + 16) >> 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.ti    = (BX_CPU_THIS_PTR sysenter_cs_msr >> 2) & 1;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.rpl   = 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.executable   = 1;           // code segment
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.c_ed         = 0;           // non-conforming
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.r_w          = 1;           // readable
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.a            = 1;           // accessed
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.base         = 0;           // base address
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.limit        = 0xFFFF;      // segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.limit_scaled = 0xFFFFFFFF;  // scaled segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.g            = 1;           // 4k granularity
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b          = 1;           // 32-bit mode
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.avl          = 0;           // available for use by system
-
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.value = (BX_CPU_THIS_PTR sysenter_cs_msr + 24) | 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.index = (BX_CPU_THIS_PTR sysenter_cs_msr + 24) >> 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.ti    = (BX_CPU_THIS_PTR sysenter_cs_msr >> 2) & 1;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].selector.rpl   = 3;
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.executable   = 0;           // data segment
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.c_ed         = 0;           // expand-up
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.r_w          = 1;           // writeable
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.a            = 1;           // accessed
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.base         = 0;           // base address
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit        = 0xFFFF;      // segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.limit_scaled = 0xFFFFFFFF;  // scaled segment limit
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.g            = 1;           // 4k granularity
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.d_b          = 1;           // 32-bit mode
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_SS].cache.u.segment.avl          = 0;           // available for use by system
-
-  // BX_INFO (("sysexit: old eip %X, esp %x, new eip %x, esp %X, eax %X", BX_CPU_THIS_PTR prev_eip, ESP, EDX, ECX, EAX));
-
-  ESP = ECX;
-  EIP = EDX;
-#else
-  UndefinedOpcode (i);
-#endif
 }
 
 #if BX_SUPPORT_X86_64

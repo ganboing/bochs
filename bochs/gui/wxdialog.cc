@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////
-// $Id: wxdialog.cc,v 1.54 2003-01-04 11:46:59 vruppert Exp $
+// $Id: wxdialog.cc,v 1.53.2.1 2003-01-11 21:40:19 cbothamy Exp $
 /////////////////////////////////////////////////////////////////
 
 // Define BX_PLUGGABLE in files that can be compiled into plugins.  For

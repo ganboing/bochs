@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: dis_groups.cc,v 1.8 2003-01-21 13:23:47 cbothamy Exp $
+// $Id: dis_groups.cc,v 1.7 2002-11-19 05:47:44 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -337,57 +337,11 @@ bx_disassemble_c::ObAL(void)
 }
 
   void
-bx_disassemble_c::YbAL(void)
-{
-  char *edi;
-
-  if (db_32bit_addrsize) {
-    edi = "EDI";
-    }
-  else {
-    edi = "DI";
-    }
-
-  dis_sprintf("ES:[%s], AL", edi);
-}
-
+bx_disassemble_c::YbAL(void) {dis_sprintf("*** YbAL() unfinished ***");}
   void
-bx_disassemble_c::ALXb(void)
-{
-  char *esi;
-
-  if (db_32bit_addrsize) {
-    esi = "ESI";
-    }
-  else {
-    esi = "SI";
-    }
-
-  dis_sprintf("AL, [%s]", esi);
-}
-
+bx_disassemble_c::ALXb(void) {dis_sprintf("*** ALXb() unfinished ***");}
   void
-bx_disassemble_c::eAXXv(void)
-{
-  char *eax, *esi;
-
-  if (db_32bit_opsize) {
-    eax = "EAX";
-    }
-  else {
-    eax = "AX";
-    }
-
-  if (db_32bit_addrsize) {
-    esi = "ESI";
-    }
-  else {
-    esi = "SI";
-    }
-
-  dis_sprintf("%s, [%s]", eax, esi);
-}
- 
+bx_disassemble_c::eAXXv(void) { dis_sprintf("*** eAXXv() unfinished ***"); }
   void
 bx_disassemble_c::Es(void) {dis_sprintf("*** Es() unfinished ***");}
   void

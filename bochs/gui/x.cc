@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: x.cc,v 1.60 2003-01-18 12:05:46 vruppert Exp $
+// $Id: x.cc,v 1.55.2.1 2003-01-03 00:29:34 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -41,13 +41,9 @@ extern "C" {
 #include <X11/Xos.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
-#include <X11/xpm.h>
 }
 
-//#include "icon_bochs.h"
-#include "icon_bochs.xpm"
-
-#include "font/vga.bitmap.h"
+#include "icon_bochs.h"
 
 class bx_x_gui_c : public bx_gui_c {
 public:
@@ -81,7 +77,9 @@ static int rows=25, columns=80;
 
 static Window win;
 static GC gc, gc_inv, gc_headerbar, gc_headerbar_inv;
+static XFontStruct *font_info;
 static unsigned font_width, font_height;
+static unsigned font_height_orig = 16;
 static Bit8u blank_line[80];
 static unsigned dimension_x=0, dimension_y=0;
 
@@ -108,8 +106,6 @@ static void disable_cursor();
 static void enable_cursor();
 
 static Bit32u convertStringToXKeysym (const char *string);
-
-static Pixmap vgafont[256];
 
 struct {
   Pixmap bmap;
@@ -264,7 +260,7 @@ Bit32u ascii_to_key_event[0x5f] = {
 extern Bit8u graphics_snapshot[32 * 1024];
 
 
-static void create_internal_vga_font(void);
+static void load_font(void);
 static void xkeypress(KeySym keysym, int press_release);
 // extern "C" void select_visual(void);
 
@@ -335,7 +331,7 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   char *window_name = "Bochs Pentium emulator, http://bochs.sourceforge.net/";
 #endif
   char *icon_name = "Bochs";
-  Pixmap icon_pixmap, icon_mask;
+  Pixmap icon_pixmap;
   XSizeHints size_hints;
   char *display_name = NULL;
   /* create GC for text and drawing */
@@ -376,12 +372,15 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   x = y = 0;
 
 
-  // Temporary values so we can create the window
-  font_width = 8;
-  font_height = 16;
+  load_font();
+
+  font_width = font_info->max_bounds.width;
+  font_height = (font_info->max_bounds.ascent +
+    font_info->max_bounds.descent);
 
   dimension_x = columns * font_width;
   dimension_y = rows * font_height + headerbar_y;
+
 
   /* create opaque window */
   win = XCreateSimpleWindow(bx_x_display, RootWindow(bx_x_display,bx_x_screen_num),
@@ -460,10 +459,8 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   /* Get available icon sizes from Window manager */
 
   /* Create pixmap of depth 1 (bitmap) for icon */
-/*  icon_pixmap = XCreateBitmapFromData(bx_x_display, win,
-    (char *) bochs_icon_bits, bochs_icon_width, bochs_icon_height);*/
-  /* Create pixmap from XPM for icon */
-  XCreatePixmapFromData(bx_x_display, win, icon_bochs_xpm, &icon_pixmap, &icon_mask, NULL);
+  icon_pixmap = XCreateBitmapFromData(bx_x_display, win,
+    (char *) bochs_icon_bits, bochs_icon_width, bochs_icon_height);
 
   /* Set size hints for window manager.  The window manager may
    * override these settings.  Note that in a real
@@ -502,8 +499,7 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   wm_hints.initial_state = NormalState;
   wm_hints.input = True;
   wm_hints.icon_pixmap = icon_pixmap;
-  wm_hints.icon_mask = icon_mask;
-  wm_hints.flags = StateHint | IconPixmapHint | IconMaskHint | InputHint;
+  wm_hints.flags = StateHint | IconPixmapHint | InputHint;
 
   class_hints.res_name = progname;
   class_hints.res_class = "Bochs";
@@ -525,6 +521,9 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
   gc_headerbar     = XCreateGC(bx_x_display, win, valuemask, &values);
   gc_headerbar_inv = XCreateGC(bx_x_display, win, valuemask, &values);
 
+  /* specify font */
+  XSetFont(bx_x_display, gc, font_info->fid);
+
   XSetState(bx_x_display, gc, white_pixel, black_pixel, GXcopy,AllPlanes);
 
   XSetState(bx_x_display, gc_inv, black_pixel, white_pixel, GXinvert,AllPlanes);
@@ -544,10 +543,6 @@ bx_x_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsigned ti
     if (report.type == MapNotify) break;
     }
   BX_DEBUG(("MapNotify found."));
-
-  // Create the VGA font
-  create_internal_vga_font();
-
 
 {
   char *imagedata;
@@ -618,19 +613,18 @@ bx_x_gui_c::mouse_enabled_changed_specific (bx_bool val)
 }
 
   void
-create_internal_vga_font(void)
+load_font(void)
 {
-  // Default values
-  font_width=8;
-  font_height=16;
-
-  for(int i=0; i<256; i++) {
-    vgafont[i]=XCreateBitmapFromData(bx_x_display, win, (const char*)bx_vgafont[i].data,
-                                     font_width, font_height);
-    if(vgafont[i] == None)
-      BX_PANIC(("Can't create vga font [%d]", i));
+  /* Load font and get font information structure. */
+  if ((font_info = XLoadQueryFont(bx_x_display,"bochsvga")) == NULL) {
+    if ((font_info = XLoadQueryFont(bx_x_display,"vga")) == NULL) {
+      if ((font_info = XLoadQueryFont(bx_x_display,"-*-vga-*")) == NULL) {
+	BX_PANIC(("Could not open vga font. See docs-html/install.html"));
+      }
+    }
   }
 }
+
 
   void
 bx_x_gui_c::handle_events(void)
@@ -1058,91 +1052,76 @@ bx_x_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
 {
   unsigned i, x, y, curs;
   unsigned new_foreground, new_background;
-  Bit8u c;
+  Bit8u string[1];
   Bit8u cs_start, cs_end;
   unsigned nchars;
-  bx_bool force_update=0;
-  unsigned char cell[32];
 
-  if (charmap_updated) {
-    BX_INFO(("charmap update. Font Height is %d",font_height));
-    for (unsigned c = 0; c<256; c++) {
-      if (char_changed[c]) {
-        XFreePixmap(bx_x_display, vgafont[c]);
-        
-        memset(cell, 0, sizeof(cell));
-        for(i=0; i<font_height; i++) {
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x01)<<7);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x02)<<5);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x04)<<3);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x08)<<1);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x10)>>1);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x20)>>3);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x40)>>5);
-          cell[i] |= ((vga_charmap[(c<<5)+i] & 0x80)>>7);
-        }
+  UNUSED(nrows);
 
-        vgafont[c]=XCreateBitmapFromData(bx_x_display, win, 
-                        (const char*)cell,
-                        font_width, font_height);
-            if(vgafont[c] == None)
-              BX_PANIC(("Can't create vga font [%d]", c));
-        char_changed[c] = 0;
-      }
-    }
-    force_update = 1;
-    charmap_updated = 0;
-  }
-
-  cs_start = (cursor_state >> 8) & 0x3f;
-  cs_end = cursor_state & 0x1f;
+  cs_start = ((cursor_state >> 8) & 0x3f) * font_height / font_height_orig;
+  cs_end = (cursor_state & 0x1f) * font_height / font_height_orig;
 
   // Number of characters on screen, variable number of rows
-  nchars = columns*nrows;
+  nchars = columns*rows;
 
   // first draw over character at original block cursor location
   if ( (prev_block_cursor_y*columns + prev_block_cursor_x) < nchars ) {
     curs = (prev_block_cursor_y*columns + prev_block_cursor_x)*2;
-    c = new_text[curs];
+    string[0] = new_text[curs];
+    if (string[0] == 0) string[0] = ' '; // convert null to space
     XSetForeground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx(new_text[curs+1] & 0x0f)]);
     XSetBackground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx((new_text[curs+1] & 0xf0) >> 4)]);
-
-    XCopyPlane(bx_x_display, vgafont[c], win, gc, 0, 0, font_width, font_height,
-               prev_block_cursor_x * font_width, prev_block_cursor_y * font_height + bx_headerbar_y, 1);
-  }
+    XDrawImageString(bx_x_display, win,
+      gc,
+      prev_block_cursor_x * font_width,
+      prev_block_cursor_y * font_height + font_info->max_bounds.ascent + bx_headerbar_y,
+      (char *) string,
+      1);
+    }
 
   for (i=0; i<nchars*2; i+=2) {
     if ( (old_text[i]!=new_text[i]) ||
-         (old_text[i+1]!=new_text[i+1]) ||
-         (force_update) ) {
+         (old_text[i+1]!=new_text[i+1]) ) {
 
-      c = new_text[i];
+      string[0] = new_text[i];
+      if (string[0] == 0) string[0] = ' '; // convert null to space
       new_foreground = new_text[i+1] & 0x0f;
       new_background = (new_text[i+1] & 0xf0) >> 4;
 
       XSetForeground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx(new_foreground)]);
       XSetBackground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx(new_background)]);
 
+//XSetForeground(bx_x_display, gc, white_pixel);
+//XSetBackground(bx_x_display, gc, black_pixel);
+
       x = (i/2) % columns;
       y = (i/2) / columns;
 
-      XCopyPlane(bx_x_display, vgafont[c], win, gc, 0, 0, font_width, font_height,
-                 x * font_width, y * font_height + bx_headerbar_y, 1);
+      XDrawImageString(bx_x_display, win,
+        gc,
+        x * font_width,
+        y * font_height + font_info->max_bounds.ascent + bx_headerbar_y,
+        (char *) string,
+        1);
       }
     }
 
   prev_block_cursor_x = cursor_x;
   prev_block_cursor_y = cursor_y;
 
+  XSetForeground(bx_x_display, gc, white_pixel);
+  XSetBackground(bx_x_display, gc, black_pixel);
+
   // now draw character at new block cursor location in reverse
   if ( ( (cursor_y*columns + cursor_x) < nchars ) && (cs_start <= cs_end) ) {
-    curs = (cursor_y*columns + cursor_x)*2;
-    c = new_text[curs];
-    XSetForeground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx((new_text[curs+1] & 0xf0) >> 4)]);
-    XSetBackground(bx_x_display, gc, col_vals[DEV_vga_get_actl_pal_idx(new_text[curs+1] & 0x0f)]);
-
-    XCopyPlane(bx_x_display, vgafont[c], win, gc, 0, cs_start, font_width, cs_end - cs_start + 1,
-               cursor_x * font_width, cursor_y * font_height + bx_headerbar_y + cs_start, 1);
+    for (unsigned i = cs_start; i <= cs_end; i++)
+      XDrawLine(bx_x_display, win,
+	gc_inv,
+	cursor_x * font_width,
+	cursor_y * font_height + bx_headerbar_y + i,
+	(cursor_x + 1) * font_width - 1,
+	cursor_y * font_height + bx_headerbar_y + i
+      );
     }
 
   XFlush(bx_x_display);
@@ -1283,9 +1262,15 @@ bx_x_gui_c::palette_change(unsigned index, unsigned red, unsigned green, unsigne
 bx_x_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight)
 {
   if (fheight > 0) {
-    font_height = fheight;
-    font_width = 8;
-    columns = x / font_width;
+    font_height_orig = fheight;
+    rows = y / fheight;
+    columns = x / 8;
+    if (fheight != font_height) {
+      y = rows * font_height;
+    }
+    if (font_width != 8) {
+      x = columns * font_width;
+    }
   }
   if ( (x != dimension_x) || (y != (dimension_y-bx_headerbar_y)) ) {
     XSizeHints hints;
@@ -1419,12 +1404,6 @@ headerbar_click(int x, int y)
   void
 bx_x_gui_c::exit(void)
 {
-  // Delete the font bitmaps
-  for (int i=0; i<256; i++) {
-    //if (vgafont[i] != NULL) 
-      XFreePixmap(bx_x_display,vgafont[i]);
-  }
-
   if (bx_x_display)
     XCloseDisplay (bx_x_display);
   BX_INFO(("Exit."));

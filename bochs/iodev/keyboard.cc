@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: keyboard.cc,v 1.74 2003-01-05 01:37:21 cbothamy Exp $
+// $Id: keyboard.cc,v 1.72.2.1 2003-01-03 00:33:50 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -125,7 +125,7 @@ bx_keyb_c::resetinternals(bx_bool powerup)
   void
 bx_keyb_c::init(void)
 {
-  BX_DEBUG(("Init $Id: keyboard.cc,v 1.74 2003-01-05 01:37:21 cbothamy Exp $"));
+  BX_DEBUG(("Init $Id: keyboard.cc,v 1.72.2.1 2003-01-03 00:33:50 cbothamy Exp $"));
   Bit32u   i;
 
   DEV_register_irq(1, "8042 Keyboard controller");
@@ -1173,7 +1173,7 @@ bx_keyb_c::timer_handler(void *this_ptr)
   unsigned
 bx_keyb_c::periodic( Bit32u   usec_delta )
 {
-/*  static int multiple=0; */
+  static int multiple=0;
   static unsigned count_before_paste=0;
   Bit8u   retval;
 

@@ -1,7 +1,7 @@
 <!--
 ================================================================
 doc/docbook/user/user.dbk
-$Id: user.dbk,v 1.111 2003-01-21 22:59:35 cbothamy Exp $
+$Id: user.dbk,v 1.100.2.1 2003-01-01 22:47:06 cbothamy Exp $
 
 This is the top level file for the Bochs Users Manual.
 ================================================================
@@ -1050,14 +1050,6 @@ The tag tells which release you want, and it can be one of the following:
     </thead>
     <tbody>
       <row>
-        <entry>2.0.1 (bugfix1)</entry>
-        <entry>REL_2_0_1_FINAL</entry>
-      </row>
-      <row>
-        <entry>2.0</entry>
-        <entry>REL_2_0_FINAL</entry>
-      </row>
-      <row>
         <entry>1.4.1 (bugfix1)</entry>
         <entry>REL_1_4_1_FINAL</entry>
       </row>
@@ -1076,6 +1068,10 @@ The tag tells which release you want, and it can be one of the following:
       <row>
         <entry>1.2</entry>
         <entry>REL_1_2_FINAL</entry>
+      </row>
+      <row>
+        <entry>1.1 (bugfix1)</entry>
+        <entry>REL_1_1_BASE</entry>
       </row>
       <row>
         <entry>1.1.2 (bugfix3)</entry>
@@ -4186,7 +4182,7 @@ instructions specific to Bochs, we can add it right here.
 <section id="winimage"><title>Win32 only: Use winimage to manipulate disk images</title>
 <para>
 Someone on the bochs-developers list mentioned that they use a program
-called WinImage, from <ulink url="http://www.winimage.com">www.winimage.com</ulink>
+called WinImage, from <ulink url="www.winimage.com">www.winimage.com</ulink>
 to read and write disk images (floppy and hard disk).  Winimage is a
 commercial product with a 30-day trial.
 </para>
@@ -4539,7 +4535,7 @@ Make sure there is a /dev/net/tun device.
 </note>
 </para>
 <para>
-In the same way, to use masquerading, you need a kernel with the following options :
+In the same way, to use masquerading, you need a kernel wth the following options :
 <screen>
  CONFIG_IP_NF_CONNTRACK (Connection tracking)
  CONFIG_IP_NF_IPTABLES (IP tables support)
@@ -4947,11 +4943,11 @@ Print the current time (number of ticks since start of simulation
 
 <screen>sb <varname>delta</varname></screen>
 
-Insert a time break point "delta" instructions into the future ("delta" is a 64-bit integer followed by "L", for example 1000L).
+Insert a time break point "delta" instructions into the future.
 
 <screen>sba <varname>time</varname></screen>
 
-Insert a time break point at "time" ("time" is a 64-bit integer followed by "L", for example 1000L).
+Insert a time break point at "time".
 
 <screen>record <varname>filename</varname></screen>
 
@@ -5037,6 +5033,29 @@ The symbol file consists of zero or more lines of the format <screen>"%x %s"</sc
   show "none" - turn off all show flags
 </screen>
 </para>
+</section>
+
+<section>
+<title>
+Resource file extensions
+</title>
+<para>
+
+<screen>time0: <varname>time</varname></screen>
+
+Specifies the start (boot) time of the virtual machine. Use a
+<varname>time</varname> value as returned by the time(2) system call. <varname>Time</varname>
+equal to 1 is a special case which starts the virtual machine at the
+current time of the simulator host.
+
+<screen>cdromd: dev=<varname>device</varname>, status=(inserted|ejected)</screen>
+
+LoseNT needs a CD in order to boot properly. Our simulated CD-ROM unit
+communicates directly with the CD-ROM driver in Linux. <varname>Device</varname>
+is a device special file to which the CD-ROM driver is connected
+(typically /dev/hdc). <varname>Device</varname> is ignored if status=ejected.
+</para>
+
 </section>
 
 <section>
@@ -5269,56 +5288,14 @@ dlx login:
 <section id="bios-tips"> 
 <title>Bios Tips</title>
         <section> 
-        <title>Booting from cdroms</title>
-        <para>
-A bootable cdrom has a special layout that is detected by the
-bios boot loader code, and executed if it conforms the specifications.
-This layout is called "El Torito Bootable CD-ROM Format Specification"
-and has been published by Phoenix and IBM. A copy of this spec is on 
-Bochs tech specs page at http://bochs.sourceforge.net/techdata.html.
-        </para>
-        <para>
-El Torito specifies 3 ways to have a bootable cd :
-<itemizedlist>
-<listitem>
-<para>floppy emulation boot : a standard floppy image is burnt inside the cd.
-In this case the bios has to redirect all first floppy accesses to this 
-image, the real floppy drive becoming the second one
-</para></listitem>
-<listitem><para>
-a "no emulation" boot : in this case the bios is instructed to load an 
-arbitrary number of sectors straight into memory, and execute it
-</para></listitem>
-<listitem><para>
-Harddisk emulation : a hard disk image in burnt inside the cd. The 
-Bios has to redirect all hard disk accesses to that image. The rel hard disks
-are still available, with bios numbers #81 and up.
-</para></listitem>
-</itemizedlist>
-
-In Bochs 2.0, Harddisk emulation is not implemented in the BIOS.
-There are also subtilities about multiple boot-images cdroms, that are
-not handled by Bochs.
-        </para>
-
-        <para>
-However our bios may be more strict than real pc bioses, I don't know.
-But I would definitely be interested to know of any cd that can boot
-on real hardware, but does not in Bochs.
-        </para>
-
+        <title>CD Boot error codes</title>
         <para>
 When failing to boot from CDROM, the bios outputs 
 the reason of the failure as
 an error code, in the log file, and on the screen.
-        </para>
-
-        <para>
-Here is a summary of what can happen when booting from the cd.
-        </para>
+Here are the meaning of the errors:
 
 <table><title>CD Boot error codes</title>
-
 <tgroup cols=2 align=left colsep=1 rowsep=1>
 <thead>
  <row>
@@ -5342,61 +5319,7 @@ Here is a summary of what can happen when booting from the cd.
 </tbody>
 </tgroup>
 </table>
-
-<para>
-<screen>
-0x01 no atapi device found
-0x02 no atapi cdrom found
-</screen>
-
-For the first two errors, an ata-*: type=cdrom is probably missing
-from the configuration file. This is what you get if no cdrom has
-been defined in Bochs conf file.
-</para>
-
-<para>
-<screen>
-0x03 can not read cd - BRVD
-</screen>
-
-For this error, the cdrom support has not been compiled in Bochs, 
-or Bochs could not open the file or device. This is what you get if
-Bochs is not able to read the cd.
-</para>
-
-<para>
-<screen>
-0x04 cd is not eltorito (BRVD)
-0x05 cd is not eltorito (ISO TAG)
-0x06 cd is not eltorito (ELTORITO TAG)
-</screen>
-
-For these errors, the data has been read from the cd, but
-the cd does not conform to the El Torito specification. This
-is what you get if the cd is not bootable.
-</para>
-
-<para>
-<screen>
-0x08 boot catalog : bad header
-0x09 boot catalog : bad platform
-0x0A boot catalog : bad signature
-0x0B boot catalog : bootable flag not set
-</screen>
-
-now the cd is eltorito, but the boot catalog is currupt, or
-the cd was made to boot on a ppc system. This should not happen
-for a x86 bootable cd.
-</para>
-
-<para>
-<screen>
-0x07 can not read cd - boot catalog
-0x0C can not read cd - boot image
-</screen>
-here, specific part of the cd could not be read. This should
-definitely not happen.
-</para>
+        </para>
         </section>
 
         <section> 
@@ -5587,10 +5510,6 @@ gui button.
 <para>
 Since Bochs version 1.4 it's possible to use VESA graphics. There are some limitations in the current implementation,
 but in general it should work ok (we have run several test programs, the XFree86 VESA display driver, etc)
-</para>
-
-<para>
-NOTE: you will need to use the LGPL'ed VGABIOS in order for application to correctly detect VESA support.
 </para>
 
 <para>

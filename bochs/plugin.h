@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: plugin.h,v 1.14 2003-01-10 22:43:51 cbothamy Exp $
+// $Id: plugin.h,v 1.11.2.1 2003-01-03 00:29:33 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 // This file provides macros and types needed for plugins.  It is based on
@@ -21,24 +21,21 @@ BOCHSAPI extern logfunctions  *pluginlog;
 extern "C" {
 #endif
 
-#define BX_PLUGIN_UNMAPPED  "unmapped"
-#define BX_PLUGIN_BIOSDEV   " biosdev"
-#define BX_PLUGIN_CMOS      "cmos"
-#define BX_PLUGIN_VGA       "vga"
-#define BX_PLUGIN_FLOPPY    "floppy"
-#define BX_PLUGIN_PARALLEL  "parallel"
-#define BX_PLUGIN_SERIAL    "serial"
-#define BX_PLUGIN_KEYBOARD  "keyboard"
-#define BX_PLUGIN_HARDDRV   "harddrv"
-#define BX_PLUGIN_DMA       "dma"
-#define BX_PLUGIN_PIC       "pic"
-#define BX_PLUGIN_PCI       "pci"
-#define BX_PLUGIN_PCI2ISA   "pci2isa"
-#define BX_PLUGIN_SB16      "sb16"
-#define BX_PLUGIN_NE2K      "ne2k"
-#define BX_PLUGIN_EXTFPUIRQ "extfpuirq"
-#define BX_PLUGIN_PCIVGA   "pcivga"
-
+#define BX_PLUGIN_UNMAPPED "unmapped"
+#define BX_PLUGIN_BIOSDEV  "biosdev"
+#define BX_PLUGIN_CMOS     "cmos"
+#define BX_PLUGIN_VGA      "vga"
+#define BX_PLUGIN_FLOPPY   "floppy"
+#define BX_PLUGIN_PARALLEL "parallel"
+#define BX_PLUGIN_SERIAL   "serial"
+#define BX_PLUGIN_KEYBOARD "keyboard"
+#define BX_PLUGIN_HARDDRV  "harddrv"
+#define BX_PLUGIN_DMA      "dma"
+#define BX_PLUGIN_PIC      "pic"
+#define BX_PLUGIN_PCI      "pci"
+#define BX_PLUGIN_PCI2ISA  "pci2isa"
+#define BX_PLUGIN_SB16     "sb16"
+#define BX_PLUGIN_NE2K     "ne2k"
 
 #define BX_REGISTER_DEVICE pluginRegisterDevice
 #define BX_REGISTER_DEVICE_DEVMODEL(a,b,c,d) pluginRegisterDeviceDevmodel(a,b,c,d)
@@ -301,10 +298,8 @@ DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(floppy)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(parallel)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(pci)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(pci2isa)
-DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(pcivga)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(sb16)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(ne2k)
-DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(extfpuirq)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(amigaos)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(beos)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(carbon)

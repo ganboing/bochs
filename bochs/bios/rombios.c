@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: rombios.c,v 1.90 2003-01-18 19:20:52 cbothamy Exp $
+// $Id: rombios.c,v 1.85.2.1 2003-01-16 21:58:42 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -95,6 +95,12 @@
 //   - the translation policy is defined in cmos regs 0x39 & 0x3a
 //
 // TODO :
+//   int09
+//     - I think the extended key check should really be done in
+//       int09, and int15/4f should be empty. I did not see any
+//       bug, but maybe some code hooking int15/4f could be 
+//       disoriented when receiving extented E0 scancode.
+//       I've got a patch for this to be applied after Bochs2.0
 //
 //   int74 
 //     - needs to be reworked.  Uses direct [bp] offsets. (?)
@@ -928,10 +934,10 @@ Bit16u cdrom_boot();
 
 #endif // BX_ELTORITO_BOOT
 
-static char bios_cvs_version_string[] = "$Revision: 1.90 $";
-static char bios_date_string[] = "$Date: 2003-01-18 19:20:52 $";
+static char bios_cvs_version_string[] = "$Revision: 1.85.2.1 $";
+static char bios_date_string[] = "$Date: 2003-01-16 21:58:42 $";
 
-static char CVSID[] = "$Id: rombios.c,v 1.90 2003-01-18 19:20:52 cbothamy Exp $";
+static char CVSID[] = "$Id: rombios.c,v 1.85.2.1 2003-01-16 21:58:42 cbothamy Exp $";
 
 /* Offset to skip the CVS $Id: prefix */ 
 #define bios_version_string  (CVSID + 4)
@@ -3140,20 +3146,16 @@ cdrom_boot()
   if(buffer[0x20]!=0x88)return 11; // Bootable
 
   write_byte(ebda_seg,&EbdaData->cdemu.media,buffer[0x21]);
-  if(buffer[0x21]==0){
-    // FIXME ElTorito Hardcoded. cdrom is hardcoded as device 0xE0. 
-    // Win2000 cd boot needs to know it booted from cd
-    write_byte(ebda_seg,&EbdaData->cdemu.emulated_drive,0xE0);
-    } 
-  else if(buffer[0x21]<4)
+  if(buffer[0x21]<4)
     write_byte(ebda_seg,&EbdaData->cdemu.emulated_drive,0x00);
   else
     write_byte(ebda_seg,&EbdaData->cdemu.emulated_drive,0x80);
 
   // FIXME ElTorito Harddisk. current code can only emulate a floppy
-  //if(read_byte(ebda_seg,&EbdaData->cdemu.emulated_drive)!=0x00)
-  //  BX_PANIC("El-Torito: Cannot boot as a harddisk yet\n");
+  if(read_byte(ebda_seg,&EbdaData->cdemu.emulated_drive)!=0x00)
+    BX_PANIC("El-Torito: Cannot boot as a harddisk yet\n");
 
+  // FIXME ElTorito Hardcoded. cdrom is hardcoded as device 1. Should be fixed if two ide interface
   write_byte(ebda_seg,&EbdaData->cdemu.controller_index,device/2);
   write_byte(ebda_seg,&EbdaData->cdemu.device_spec,device%2);
 
@@ -3181,7 +3183,7 @@ cdrom_boot()
   if((error = ata_cmd_packet(device, 12, get_SS(), atacmd, 0, nbsectors*512L, ATA_DATA_IN, boot_segment,0)) != 0)
     return 12;
 
-  // Remember the media type
+  // Remeber the media type
   switch(read_byte(ebda_seg,&EbdaData->cdemu.media)) {
     case 0x01:  // 1.2M floppy
       write_word(ebda_seg,&EbdaData->cdemu.vdevice.spt,15);
@@ -3198,27 +3200,24 @@ cdrom_boot()
       write_word(ebda_seg,&EbdaData->cdemu.vdevice.cylinders,80);
       write_word(ebda_seg,&EbdaData->cdemu.vdevice.heads,2);
       break;
-    case 0x04:  // Harddrive
-      write_word(ebda_seg,&EbdaData->cdemu.vdevice.spt,read_byte(boot_segment,446+6)&0x3f);
-      write_word(ebda_seg,&EbdaData->cdemu.vdevice.cylinders,
-	      (read_byte(boot_segment,446+6)<<2) + read_byte(boot_segment,446+7) + 1);
-      write_word(ebda_seg,&EbdaData->cdemu.vdevice.heads,read_byte(boot_segment,446+5) + 1);
-      break;
    }
 
-  if(read_byte(ebda_seg,&EbdaData->cdemu.media)!=0) {
-    // Increase bios installed hardware number of devices
+  // Increase bios installed hardware number of floppy, booted from floppy
+  if(read_byte(ebda_seg,&EbdaData->cdemu.media)!=0)
     if(read_byte(ebda_seg,&EbdaData->cdemu.emulated_drive)==0x00)
       write_byte(0x40,0x10,read_byte(0x40,0x10)|0x41);
-    else
-      write_byte(ebda_seg, &EbdaData->ata.hdcount, read_byte(ebda_seg, &EbdaData->ata.hdcount) + 1);
-   }
-
   
   // everything is ok, so from now on, the emulation is active
   if(read_byte(ebda_seg,&EbdaData->cdemu.media)!=0)
     write_byte(ebda_seg,&EbdaData->cdemu.active,0x01);
 
+  // if we are not emulating a device
+  if(read_byte(ebda_seg,&EbdaData->cdemu.media)==0) {
+    // FIXME ElTorito Hardcoded. cdrom is hardcoded as device 0xE0. 
+    // Win2000 cd boot needs this
+    write_byte(ebda_seg,&EbdaData->cdemu.emulated_drive,0xE0);
+    }
+  
   // return the boot drive + no error
   return (read_byte(ebda_seg,&EbdaData->cdemu.emulated_drive)*0x100)+0;
 }
@@ -3321,7 +3320,7 @@ int15_function(regs, ES, DS, FLAGS)
   Bit8u   ret, mouse_data1, mouse_data2, mouse_data3;
   Bit8u   comm_byte, mf2_state;
   Bit32u  extended_memory_size=0; // 64bits long
-  Bit16u  CX,DX;
+  Bit16u  CX;
 
 BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 
@@ -3342,7 +3341,11 @@ BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 #if BX_CPU < 2
       regs.u.r8.ah = UNSUPPORTED_FUNCTION;
 #else
-      // nop
+      if (regs.u.r8.al == 0xE0) {
+        mf2_state = read_byte(0x0040, 0x96);
+        write_byte(0x0040, 0x96, mf2_state | 0x01);
+        regs.u.r8.al = inb(0x60);
+        }
 #endif
       SET_CF();
       break;
@@ -3350,47 +3353,6 @@ BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
     case 0x52:    // removable media eject
       CLEAR_CF();
       regs.u.r8.ah = 0;  // "ok ejection may proceed"
-      break;
-
-    case 0x86:
-      // Wait for CX:DX microseconds. currently using the 
-      // refresh request port 0x61 bit4, toggling every 15usec 
-
-      CX = regs.u.r16.cx;
-      DX = regs.u.r16.dx;
-
-ASM_START
-      sti
-
-      ;; Get the count in eax
-      mov  bx, sp
-      SEG SS
-        mov  ax, _int15_function.CX [bx]
-      shl  eax, #16
-      SEG SS
-        mov  ax, _int15_function.DX [bx]
-
-      ;; convert to numbers of 15usec ticks
-      mov ebx, #15
-      xor edx, edx
-      div eax, ebx
-      mov ecx, eax
-
-      ;; wait for ecx number of refresh requests
-      in al, #0x61
-      and al,#0x10
-      mov ah, al
-
-int1586_tick:
-      in al, #0x61
-      and al,#0x10
-      cmp al, ah
-      je  int1586_tick
-      mov ah, al
-      dec ecx
-      jnz int1586_tick
-ASM_END
-
       break;
 
     case 0x87:
@@ -5241,6 +5203,7 @@ int13_cdemu(DI, SI, BP, SP, BX, DX, CX, AX, ES, FLAGS)
   //BX_DEBUG_INT13_ET("int13_cdemu: SS=%04x ES=%04x DI=%04x SI=%04x\n", get_SS(), ES, DI, SI);
   
   /* at this point, we are emulating a floppy/harddisk */
+  // FIXME ElTorito Harddisk. Harddisk emulation is not implemented
   
   // Recompute the device number 
   device  = read_byte(ebda_seg,&EbdaData->cdemu.controller_index) * 2;
@@ -5324,11 +5287,11 @@ int13_cdemu(DI, SI, BP, SP, BX, DX, CX, AX, ES, FLAGS)
       SET_AL(nbsectors);
 
       // start lba on cd
-      slba  = (Bit32u)vlba/4; 
+      slba  = (Bit16u)vlba/4;               // FIXME ElTorito Harddisk. should allow Bit32u image size - needs compiler helper function
       before= (Bit16u)vlba%4;
 
       // end lba on cd
-      elba = (Bit32u)(vlba+nbsectors-1)/4;
+      elba = (Bit16u)(vlba+nbsectors-1)/4; // FIXME ElTorito Harddisk. should allow Bit32u image size - needs compiler helper function
       
       memsetb(get_SS(),atacmd,0,12);
       atacmd[0]=0x28;                      // READ command
@@ -5359,7 +5322,6 @@ int13_cdemu(DI, SI, BP, SP, BX, DX, CX, AX, ES, FLAGS)
       SET_CL((( vcylinders >> 2) & 0xc0) | ( vspt  & 0x3f ));
       SET_DH( vheads );
       SET_DL( 0x02 );   // FIXME ElTorito Various. should send the real count of drives 1 or 2
-                        // FIXME ElTorito Harddisk. should send the HD count
  
       switch(read_byte(ebda_seg,&EbdaData->cdemu.media)) {
         case 0x01: SET_BL( 0x02 ); break;
@@ -5373,7 +5335,7 @@ int13_cdemu(DI, SI, BP, SP, BX, DX, CX, AX, ES, FLAGS)
       break;
 
     case 0x15: /* read disk drive size */
-      // FIXME ElTorito Harddisk. What geometry to send ?
+      // FIXME ElTorito Harddisk. if we want to emulate a harddisk
       SET_AH(0x03);
       goto int13_success_noah;
       break;
@@ -5383,7 +5345,6 @@ int13_cdemu(DI, SI, BP, SP, BX, DX, CX, AX, ES, FLAGS)
     case 0x0b: /* write disk sectors with ECC */
     case 0x18: /* set media type for format */
     case 0x41: // IBM/MS installation check
-      // FIXME ElTorito Harddisk. Darwin would like to use EDD
     case 0x42: // IBM/MS extended read
     case 0x43: // IBM/MS extended write
     case 0x44: // IBM/MS verify sectors
@@ -7426,7 +7387,10 @@ ASM_END
 
   ; //FIXME BCC BUG
 ASM_START
-  call eoi_both_pics
+  ;; send EOI to slave & master PICs
+  mov  al, #0x20
+  out  #0xA0, al ;; slave  PIC EOI
+  out  #0x20, al ;; master PIC EOI
 ASM_END
 }
 
@@ -7457,7 +7421,10 @@ int74_handler:
   call far ptr[0x22]
 int74_done:
   cli
-  call eoi_both_pics
+  mov  al, #0x20
+  ;; send EOI to slave & master PICs
+  out  #0xA0, al ;; slave  PIC EOI
+  out  #0x20, al ;; master PIC EOI
   add sp, #8     ;; pop status, x, y, z
 
   pop ds          ;; restore DS
@@ -8096,22 +8063,14 @@ ebda_post:
 ;--------------------
 ; relocated here because the primary POST area isnt big enough.
 eoi_jmp_post:
-  call eoi_both_pics
+  mov al, #0x20
+  out 0xA0, al   ;; send EOI to PIC
+  out 0x20, al   ;; send EOI to PIC
 
   xor ax, ax
   mov ds, ax
 
   jmp far ptr [0x467]
-
-
-;--------------------
-eoi_both_pics:
-  mov   al, #0x20
-  out   #0xA0, al ;; slave  PIC EOI
-eoi_master_pic:
-  mov   al, #0x20
-  out   #0x20, al ;; master PIC EOI
-  ret
 
 ;--------------------
 BcdToBin:
@@ -8214,7 +8173,9 @@ int76_handler:
   mov   ax, #0x0040
   mov   ds, ax
   mov   0x008E, #0xff
-  call  eoi_both_pics
+  mov   al, #0x20
+  out   #0xA0, al ;; slave  PIC EOI
+  out   #0x20, al ;; master PIC EOI
   pop   ds
   pop   ax
   iret
@@ -8780,9 +8741,6 @@ post_default_ints:
   ;; PS/2 mouse setup
   SET_INT_VECTOR(0x74, #0xF000, #int74_handler)
 
-  ;; IRQ13 (FPU exception) setup
-  SET_INT_VECTOR(0x75, #0xF000, #int75_handler)
-
   ;; Video setup
   SET_INT_VECTOR(0x10, #0xF000, #int10_handler)
 
@@ -8905,17 +8863,8 @@ rom_scan_increment:
 
 
 .org 0xe2c3 ; NMI Handler Entry Point
-nmi:
-  ;; FIXME the NMI handler should not panic
-  ;; but iret when called from int75 (fpu exception)
   call _nmi_handler_msg
   HALT(__LINE__)
-  iret
-
-int75_handler:
-  out  0xf0, al         // clear irq13 
-  call eoi_both_pics    // clear interrupt
-  int  2                // legacy nmi call
   iret
 
 ;-------------------------------------------
@@ -9120,23 +9069,8 @@ int09_handler:
   //test al, #0x80            ;;look for key release
   //jnz  int09_process_key    ;; dont pass releases to intercept?
 
-  ;; check for extended key
-  cmp  al, #0xe0
-  jne int09_call_int15_4f
-  
-  push ds
-  xor  ax, ax
-  mov  ds, ax
-  mov  al, BYTE [0x496]     ;; mf2_state |= 0x01
-  or   al, #0x01
-  mov  BYTE [0x496], al
-  pop  ds
-  
-  in  al, #0x60             ;;read another key from keyboard controller
-
   sti
 
-int09_call_int15_4f:
 #ifdef BX_CALL_INT15_4F
   mov  ah, #0x4f     ;; allow for keyboard intercept
   stc
@@ -9156,7 +9090,8 @@ int09_call_int15_4f:
 
 int09_done:
   cli
-  call eoi_master_pic
+  mov  al, #0x20     ;; send EOI to master PIC
+  out  #0x20, al
 
 int09_finish:
   mov al, #0xAE      ;;enable keyboard
@@ -9246,7 +9181,8 @@ int0e_normal:
   push ds
   mov  ax, #0x0000 ;; segment 0000
   mov  ds, ax
-  call eoi_master_pic
+  mov  al, #0x20
+  out  0x20, al  ;; send EOI to PIC
   mov  al, 0x043e
   or   al, #0x80 ;; diskette interrupt has occurred
   mov  0x043e, al
@@ -9450,7 +9386,8 @@ int08_store_ticks:
   //CALL_EP( 0x1c << 2 )
   int #0x1c
   cli
-  call eoi_master_pic
+  mov al, #0x20
+  out 0x20, al  ; send EOI to PIC
   pop ds
   pop eax
   iret

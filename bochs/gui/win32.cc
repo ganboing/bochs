@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: win32.cc,v 1.50 2003-01-02 09:49:48 vruppert Exp $
+// $Id: win32.cc,v 1.47.2.2 2003-01-03 00:36:01 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -36,7 +36,7 @@
 #include "bochs.h"
 #if BX_WITH_WIN32
 
-#include "win32res.h"
+#include "icon_bochs.h"
 #include "font/vga.bitmap.h"
 // windows.h is included by bochs.h
 #include <commctrl.h>
@@ -376,36 +376,40 @@ void bx_win32_gui_c::specific_init(int argc, char **argv, unsigned
 VOID UIThread(PVOID pvoid) {
   MSG msg;
   HDC hdc;
-  WNDCLASS wndclass;
+  WNDCLASSEX wndclass;
   RECT wndRect, wndRect2;
 
   workerThreadID = GetCurrentThreadId();
 
+  wndclass.cbSize = sizeof (wndclass);
   wndclass.style = CS_HREDRAW | CS_VREDRAW;
   wndclass.lpfnWndProc = mainWndProc;
   wndclass.cbClsExtra = 0;
   wndclass.cbWndExtra = 0;
   wndclass.hInstance = stInfo.hInstance;
-  wndclass.hIcon = LoadIcon (stInfo.hInstance, MAKEINTRESOURCE(ICON_BOCHS));
+  wndclass.hIcon = LoadIcon (NULL, IDI_APPLICATION);
   wndclass.hCursor = LoadCursor (NULL, IDC_ARROW);
   wndclass.hbrBackground = (HBRUSH) GetStockObject (BLACK_BRUSH);
   wndclass.lpszMenuName = NULL;
   wndclass.lpszClassName = szAppName;
+  wndclass.hIconSm = LoadIcon (NULL, IDI_APPLICATION);
 
-  RegisterClass (&wndclass);
+  RegisterClassEx (&wndclass);
 
+  wndclass.cbSize = sizeof (wndclass);
   wndclass.style = CS_HREDRAW | CS_VREDRAW;
   wndclass.lpfnWndProc = simWndProc;
   wndclass.cbClsExtra = 0;
   wndclass.cbWndExtra = 0;
   wndclass.hInstance = stInfo.hInstance;
-  wndclass.hIcon = NULL;
+  wndclass.hIcon = LoadIcon (NULL, IDI_APPLICATION);
   wndclass.hCursor = LoadCursor (NULL, IDC_ARROW);
   wndclass.hbrBackground = (HBRUSH) GetStockObject (BLACK_BRUSH);
   wndclass.lpszMenuName = NULL;
   wndclass.lpszClassName = "SIMWINDOW";
+  wndclass.hIconSm = NULL;
 
-  RegisterClass (&wndclass);
+  RegisterClassEx (&wndclass);
 
   stInfo.mainWnd = CreateWindow (szAppName,
                      szWindowName,

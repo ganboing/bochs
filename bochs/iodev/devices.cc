@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: devices.cc,v 1.49 2003-01-10 22:43:52 cbothamy Exp $
+// $Id: devices.cc,v 1.46.2.1 2003-01-11 21:59:39 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -51,9 +51,6 @@ bx_devices_c::bx_devices_c(void)
 #if BX_PCI_SUPPORT
   pluginPciBridge = &stubPci;
   pluginPci2IsaBridge = NULL;
-#if BX_PCI_VGA_SUPPORT
-    pluginPciVgaAdapter = NULL;
-#endif
 #endif
   pit = NULL;
   pluginKeyboard = &stubKeyboard;
@@ -69,7 +66,6 @@ bx_devices_c::bx_devices_c(void)
   pluginHardDrive = &stubHardDrive;
   pluginSB16Device = NULL;
   pluginNE2kDevice =&stubNE2k;
-  pluginExtFpuIrq = NULL;
   g2h = NULL;
 #if BX_IODEBUG_SUPPORT
   iodebug = NULL;
@@ -90,7 +86,7 @@ bx_devices_c::init(BX_MEM_C *newmem)
 {
   unsigned i;
 
-  BX_DEBUG(("Init $Id: devices.cc,v 1.49 2003-01-10 22:43:52 cbothamy Exp $"));
+  BX_DEBUG(("Init $Id: devices.cc,v 1.46.2.1 2003-01-11 21:59:39 cbothamy Exp $"));
   mem = newmem;
 
   /* no read / write handlers defined */
@@ -141,7 +137,6 @@ bx_devices_c::init(BX_MEM_C *newmem)
     PLUG_load_plugin(serial, PLUGTYPE_OPTIONAL);
   if (is_parallel_enabled ()) 
     PLUG_load_plugin(parallel, PLUGTYPE_OPTIONAL);
-  PLUG_load_plugin(extfpuirq, PLUGTYPE_OPTIONAL);
 
   // Start with registering the default (unmapped) handler
   pluginUnmapped->init ();
@@ -151,9 +146,6 @@ bx_devices_c::init(BX_MEM_C *newmem)
 #if BX_PCI_SUPPORT
     PLUG_load_plugin(pci, PLUGTYPE_OPTIONAL);
     PLUG_load_plugin(pci2isa, PLUGTYPE_OPTIONAL);
-#if BX_PCI_VGA_SUPPORT
-    PLUG_load_plugin(pcivga, PLUGTYPE_OPTIONAL);
-#endif
 #else
     BX_ERROR(("Bochs is not compiled with PCI support"));
 #endif
@@ -269,9 +261,6 @@ bx_devices_c::reset(unsigned type)
   if (bx_options.Oi440FXSupport->get ()) {
     pluginPciBridge->reset(type);
     pluginPci2IsaBridge->reset(type);
-#if BX_PCI_VGA_SUPPORT
-    pluginPciVgaAdapter->reset(type);
-#endif
   }
 #endif
 #if BX_SUPPORT_IOAPIC
