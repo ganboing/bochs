@@ -304,15 +304,15 @@ debugger_check:
     if (BX_CPU_THIS_PTR break_point) {
 	  switch (BX_CPU_THIS_PTR break_point) {
 		case BREAK_POINT_TIME:
-		      BX_INFO(("[%lld] Caught time breakpoint", bx_pc_system.time_ticks()));
+		      BX_CPU_THIS_PTR info("[%lld] Caught time breakpoint\n", bx_pc_system.time_ticks());
 		      BX_CPU_THIS_PTR stop_reason = STOP_TIME_BREAK_POINT;
 		      return;
 		case BREAK_POINT_READ:
-		      BX_INFO(("[%lld] Caught read watch point", bx_pc_system.time_ticks()));
+		      BX_CPU_THIS_PTR info("[%lld] Caught read watch point\n", bx_pc_system.time_ticks());
 		      BX_CPU_THIS_PTR stop_reason = STOP_READ_WATCH_POINT;
 		      return;
 		case BREAK_POINT_WRITE:
-		      BX_INFO(("[%lld] Caught write watch point", bx_pc_system.time_ticks()));
+		      BX_CPU_THIS_PTR info("[%lld] Caught write watch point\n", bx_pc_system.time_ticks());
 		      BX_CPU_THIS_PTR stop_reason = STOP_WRITE_WATCH_POINT;
 		      return;
 		default:
@@ -323,13 +323,13 @@ debugger_check:
     // (mch) Magic break point support
     if (BX_CPU_THIS_PTR magic_break) {
 	  if (bx_dbg.magic_break_enabled) {
-		BX_DEBUG(("Stopped on MAGIC BREAKPOINT"));
+		BX_CPU_THIS_PTR info("Stopped on MAGIC BREAKPOINT\n");
 		BX_CPU_THIS_PTR stop_reason = STOP_MAGIC_BREAK_POINT;
 		return;
 	  } else {
 		BX_CPU_THIS_PTR magic_break = 0;
 		BX_CPU_THIS_PTR stop_reason = STOP_NO_REASON;
-		BX_DEBUG(("Ignoring MAGIC BREAKPOINT"));
+		BX_CPU_THIS_PTR info("Ignoring MAGIC BREAKPOINT\n");
 	  }
     }
 #endif
@@ -371,7 +371,7 @@ static Bit8u FetchBuffer[16];
 
     if (BX_CPU_THIS_PTR bytesleft < 16) {
       // make sure (bytesleft - remain) below doesn't go negative
-      BX_PANIC(("fetch_decode: bytesleft==0 after prefetch"));
+      BX_PANIC(("fetch_decode: bytesleft==0 after prefetch\n"));
       }
     temp_ptr = fetch_ptr = BX_CPU_THIS_PTR fetch_ptr;
 
@@ -381,7 +381,7 @@ static Bit8u FetchBuffer[16];
       }
     ret = FetchDecode(FetchBuffer, &i, 16, is_32);
     if (ret==0)
-      BX_PANIC(("fetchdecode: cross boundary: ret==0"));
+      BX_PANIC(("fetchdecode: cross boundary: ret==0\n"));
     if (i.ResolveModrm) {
       BX_CPU_CALL_METHOD(i.ResolveModrm, (&i));
       }
@@ -423,7 +423,7 @@ handle_async_event:
       // interrupt ends the HALT condition
       BX_CPU_THIS_PTR debug_trap = 0; // clear traps for after resume
       BX_CPU_THIS_PTR inhibit_mask = 0; // clear inhibits for after resume
-      //bx_printf ("halt condition has been cleared in %s", name);
+      //bx_printf ("halt condition has been cleared in %s\n", name);
     } else {
       // HALT condition remains, return so other CPUs have a chance
 #if BX_DEBUGGER
@@ -490,7 +490,7 @@ handle_async_event:
     // if no local APIC, always acknowledge the PIC.
     vector = BX_IAC(); // may set INTR with next interrupt
 #endif
-    //BX_DEBUG(("decode: interrupt %u",
+    //if (bx_dbg.interrupts) BX_INFO(("decode: interrupt %u\n",
     //                                   (unsigned) vector));
     BX_CPU_THIS_PTR errorno = 0;
     BX_CPU_THIS_PTR EXT   = 1; /* external event */
@@ -572,7 +572,7 @@ BX_CPU_C::prefetch(void)
   new_linear_addr = BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.base + temp_eip;
   BX_CPU_THIS_PTR prev_linear_page = new_linear_addr & 0xfffff000;
   if (temp_eip > temp_limit) {
-    BX_PANIC(("prefetch: EIP > CS.limit"));
+    BX_PANIC(("prefetch: EIP > CS.limit\n"));
     }
 
   if (BX_CPU_THIS_PTR cr0.pg) {
@@ -588,7 +588,7 @@ BX_CPU_C::prefetch(void)
     // don't take this out if dynamic translation enabled,
     // otherwise you must make a check to see if bytesleft is 0 after
     // a call to prefetch() in the dynamic code.
-    BX_PANIC(("prefetch: running in bogus memory"));
+    BX_PANIC(("prefetch: running in bogus memory\n"));
     }
 
   // max physical address as confined by page boundary
@@ -656,7 +656,7 @@ BX_CPU_C::dbg_is_begin_instr_bpoint(Bit32u cs, Bit32u eip, Bit32u laddr,
   // (not the one generating the mode switch).
   if (BX_CPU_THIS_PTR mode_break && 
       (BX_CPU_THIS_PTR debug_vm != BX_CPU_THIS_PTR eflags.vm)) {
-    BX_INFO(("Caught vm mode switch breakpoint"));
+    BX_CPU_THIS_PTR info("Caught vm mode switch breakpoint\n");
     BX_CPU_THIS_PTR debug_vm = BX_CPU_THIS_PTR eflags.vm;
     BX_CPU_THIS_PTR stop_reason = STOP_MODE_BREAK_POINT;
     return 1;
@@ -751,7 +751,7 @@ BX_CPU_C::dbg_is_end_instr_bpoint(Bit32u cs, Bit32u eip, Bit32u laddr,
       bx_dbg_async_pin_ack(BX_DBG_ASYNC_PENDING_A20,
                            bx_guard.async_changes_pending.a20);
     if (bx_guard.async_changes_pending.which) {
-      BX_PANIC(("decode: async pending unrecognized."));
+      BX_PANIC(("decode: async pending unrecognized.\n"));
       }
     }
 #endif

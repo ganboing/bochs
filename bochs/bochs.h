@@ -34,7 +34,6 @@ extern "C" {
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #ifndef WIN32
 #  include <unistd.h>
 #else
@@ -81,10 +80,6 @@ extern "C" {
 #include "osdep.h"       /* platform dependent includes and defines */ 
 #include "debug/debug.h"
 #include "bxversion.h"
-
-#if BX_USE_CONTROL_PANEL
-#include "gui/siminterface.h"
-#endif
 
 //
 // some macros to interface the CPU and memory to external environment
@@ -237,7 +232,7 @@ extern Bit8u DTPageDirty[];
 #define LOGLEV_INFO  1
 #define LOGLEV_ERROR 2
 #define LOGLEV_PANIC 3
-#define N_LOGLEV   4
+#define MAX_LOGLEV   4
 
 typedef class logfunctions {
 	char *prefix;
@@ -245,10 +240,8 @@ typedef class logfunctions {
 // values of onoff: 0=ignore, 1=report, 2=fatal
 #define ACT_IGNORE 0
 #define ACT_REPORT 1
-#define ACT_ASK    2
-#define ACT_FATAL  3
-#define N_ACT      4
-	int onoff[N_LOGLEV];
+#define ACT_FATAL  2
+	int onoff[MAX_LOGLEV];
 	class iofunctions *logio;
 public:
 	logfunctions(void);
@@ -260,19 +253,10 @@ public:
 	void panic(char *fmt, ...);
 	void ldebug(char *fmt, ...);
 	void fatal (char *prefix, char *fmt, va_list ap);
-	void ask (int level, char *prefix, char *fmt, va_list ap);
 	void setprefix(char *);
 	void settype(int);
 	void setio(class iofunctions *);
-	void setonoff(int loglev, int value) {
-	  assert (loglev >= 0 && loglev < N_LOGLEV);
-	  onoff[loglev] = value; 
-	}
-	char *getprefix () { return prefix; }
-	int getonoff(int level) {
-	  assert (level>=0 && level<N_LOGLEV);
-	  return onoff[level]; 
-        }
+	void setonoff(int loglev, int value) { onoff[loglev] = value; }
 } logfunc_t;
 
 class iofunctions {
@@ -281,67 +265,16 @@ class iofunctions {
 	class logfunctions *log;
 	void init(void);
 	void flush(void);
-// Log Class defines
-#define    IOLOG           0
-#define    FDLOG           1
-#define    GENLOG          2
-#define    CMOSLOG         3
-#define    CDLOG           4
-#define    DMALOG          5
-#define    ETHLOG          6
-#define    G2HLOG          7
-#define    HDLOG           8
-#define    KBDLOG          9
-#define    NE2KLOG         10
-#define    PARLOG          11
-#define    PCILOG          12
-#define    PICLOG          13
-#define    PITLOG          14
-#define    SB16LOG         15
-#define    SERLOG          16
-#define    VGALOG          17
-#define    STLOG           18   // state_file.cc
-#define    DEVLOG          19
-#define    MEMLOG          20
-#define    DISLOG          21
-#define    GUILOG          22
-#define    IOAPICLOG       23
-#define    APICLOG         24
-#define    CPU0LOG         25
-#define    CPU1LOG         26
-#define    CPU2LOG         27
-#define    CPU3LOG         28
-#define    CPU4LOG         29
-#define    CPU5LOG         30
-#define    CPU6LOG         31
-#define    CPU7LOG         32
-#define    CPU8LOG         33
-#define    CPU9LOG         34
-#define    CPU10LOG         35
-#define    CPU11LOG         36
-#define    CPU12LOG         37
-#define    CPU13LOG         38
-#define    CPU14LOG         39
-#define    CPU15LOG         40
-#define    CTRLLOG         41
+	char *getlevel(int i) {
+		static char *loglevel[] = {
+			"DEBUG",
+			"INFO",
+			"ERROR",
+			"PANIC",
+		};
+		return loglevel[i];
+	}
 
-
-public:
-	iofunctions(void);
-	iofunctions(FILE *);
-	iofunctions(int);
-	iofunctions(char *);
-	~iofunctions(void);
-
-	void out(int facility, int level, char *pre, char *fmt, va_list ap);
-
-	void init_log(char *fn);
-	void init_log(int fd);
-	void init_log(FILE *fs);
-	int get_n_logfns () { return n_logfn; }
-	logfunc_t *get_logfn (int index) { return logfn_list[index]; }
-	void add_logfn (logfunc_t *fn);
-	void set_log_action (int loglevel, int action);
 	char *getclass(int i) {
 		char *logclass[] = {
 		  "IO  ",
@@ -385,33 +318,75 @@ public:
 		  "CPUd",
 		  "CPUe",
 		  "CPUf",
-		  "CTRL"
 		};
 		return logclass[i];
 	}
-	char *getlevel(int i) {
-		static char *loglevel[] = {
-			"DEBUG",
-			"INFO",
-			"ERROR",
-			"PANIC",
-		};
-	        assert (i>=0 && i<4);
-		return loglevel[i];
-	}
-	char *getaction(int i) {
-	   static char *name[] = { "ignore", "report", "ask", "fatal" };
-	   assert (i>=ACT_IGNORE && i<N_ACT);
-	   return name[i];
-	}
 
+// Log Class defines
+#define    IOLOG           0
+#define    FDLOG           1
+#define    GENLOG          2
+#define    CMOSLOG         3
+#define    CDLOG           4
+#define    DMALOG          5
+#define    ETHLOG          6
+#define    G2HLOG          7
+#define    HDLOG           8
+#define    KBDLOG          9
+#define    NE2KLOG         10
+#define    PARLOG          11
+#define    PCILOG          12
+#define    PICLOG          13
+#define    PITLOG          14
+#define    SB16LOG         15
+#define    SERLOG          16
+#define    VGALOG          17
+#define    STLOG           18   // state_file.cc
+#define    DEVLOG          19
+#define    MEMLOG          20
+#define    DISLOG          21
+#define    GUILOG          22
+#define    IOAPICLOG       23
+#define    APICLOG         24
+#define    CPU0LOG         25
+#define    CPU1LOG         26
+#define    CPU2LOG         27
+#define    CPU3LOG         28
+#define    CPU4LOG         29
+#define    CPU5LOG         30
+#define    CPU6LOG         31
+#define    CPU7LOG         32
+#define    CPU8LOG         33
+#define    CPU9LOG         34
+#define    CPU10LOG         35
+#define    CPU11LOG         36
+#define    CPU12LOG         37
+#define    CPU13LOG         38
+#define    CPU14LOG         39
+#define    CPU15LOG         40
+
+
+public:
+	iofunctions(void);
+	iofunctions(FILE *);
+	iofunctions(int);
+	iofunctions(char *);
+	~iofunctions(void);
+
+	void out(int facility, int level, char *pre, char *fmt, va_list ap);
+
+	void init_log(char *fn);
+	void init_log(int fd);
+	void init_log(FILE *fs);
+	int get_n_logfns () { return n_logfn; }
+	logfunc_t *get_logfn (int index) { return logfn_list[index]; }
+	void add_logfn (logfunc_t *fn);
+	void set_log_action (int loglevel, int action);
 protected:
 	int n_logfn;
 #define MAX_LOGFNS 64
 	logfunc_t *logfn_list[MAX_LOGFNS];
 	char *logfn;
-
-
 };
 
 typedef class iofunctions iofunc_t;
@@ -507,7 +482,7 @@ typedef struct {
   void* record_io;
   } bx_debug_t;
 
-#define BX_ASSERT(x) do {if (!(x)) BX_PANIC(("failed assertion \"%s\" at %s:%d\n", #x, __FILE__, __LINE__));} while (0)
+#define BX_ASSERT(x) do {if (!(x)) BX_PANIC(("failed assertion \"%s\" at %s:%s\n", #x, __FILE__, __LINE__));} while (0)
 void bx_signal_handler (int signum);
 void bx_atexit(void);
 extern bx_debug_t bx_dbg;
@@ -519,7 +494,6 @@ extern bx_debug_t bx_dbg;
 #define BX_FLOPPY_1_44   12 // 1.44M 3.5"
 #define BX_FLOPPY_2_88   13 // 2.88M 3.5"
 #define BX_FLOPPY_720K   14 // 720K  3.5"
-#define BX_FLOPPY_LAST   14 // last one
 
 
 #define BX_READ    10
@@ -538,9 +512,9 @@ enum PCS_OP { PCS_CLEAR, PCS_SET, PCS_TOGGLE };
 #include "pc_system.h"
 
 #include "gui/gui.h"
-#include "gui/control.h"
 extern bx_gui_c   bx_gui;
 #include "iodev/iodev.h"
+
 
 
 
@@ -562,25 +536,15 @@ extern bx_devices_c   bx_devices;
 #define BX_RESET_HARDWARE 11
 
 
-char *bx_find_bochsrc (void);
-int bx_read_configuration (char *rcfile, int argc, char *argv[]);
-int bx_write_configuration (char *rcfile, int overwrite);
-
-#if BX_USE_CONTROL_PANEL==0
-// with control panel enabled, this is defined in gui/siminterface.h instead.
-
-#define BX_PATHNAME_LEN 512
-
-// for control panel, I moved these into gui/siminterface.h. BBD
 typedef struct {
-  char path[BX_PATHNAME_LEN];
+  char path[512];
   unsigned type;
   unsigned initial_status;
   } bx_floppy_options;
 
 typedef struct {
   Boolean present;
-  char path[BX_PATHNAME_LEN];
+  char path[512];
   unsigned int cylinders;
   unsigned int heads;
   unsigned int spt;
@@ -589,10 +553,9 @@ typedef struct {
 struct bx_cdrom_options
 {
   Boolean present;
-  char dev[BX_PATHNAME_LEN];
+  char dev[512];
   Boolean inserted;
 };
-#endif    /* if BX_USE_CONTROL_PANEL==0 */
 
 typedef struct {
   char *path;
@@ -636,15 +599,8 @@ typedef struct {
   char    *initrd;
   } bx_load32bitOSImage_t;
 
-typedef struct {
-  char filename[BX_PATHNAME_LEN];
-  // one array item for each log level, indexed by LOGLEV_*.
-  // values: ACT_IGNORE, ACT_REPORT, ACT_ASK, ACT_FATAL
-  unsigned char actions[N_LOGLEV];  
-} bx_log_options;
 
 typedef struct {
-  int present;
   char *midifile, *wavefile, *logfile;
   unsigned int midimode, wavemode, loglevel;
   Bit32u dmatimer;
@@ -672,7 +628,9 @@ typedef struct {
   bx_ne2k_options   ne2k;
   Boolean           newHardDriveSupport;
   bx_load32bitOSImage_t load32bitOSImage;
-  bx_log_options    log;
+         // one array item for each log level, indexed by LOGLEV_*.
+	 // values: 0=ignore event, 1=report event in log, 2=fatal
+  unsigned char log_actions[MAX_LOGLEV];  
   } bx_options_t;
 
 extern bx_options_t bx_options;
@@ -686,7 +644,7 @@ extern bx_options_t bx_options;
 
 #define BX_USE_PS2_MOUSE 1
 
-int bx_init_hardware ();
+int bx_bochs_init(int argc, char *argv[]);
 
 #include "instrument.h"
 
