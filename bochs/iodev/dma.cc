@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: dma.cc,v 1.19 2002-06-16 15:02:27 vruppert Exp $
+// $Id: dma.cc,v 1.17 2002-01-18 16:33:47 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -42,10 +42,11 @@ bx_dma_c bx_dma;
 #endif
 
 
+
 bx_dma_c::bx_dma_c(void)
 {
-  put("DMA");
-  settype(DMALOG);
+	put("DMA");
+	settype(DMALOG);
 }
 
 bx_dma_c::~bx_dma_c(void)
@@ -53,87 +54,16 @@ bx_dma_c::~bx_dma_c(void)
 	BX_DEBUG(("Exit."));
 }
 
-  unsigned
-bx_dma_c::registerDMA8Channel(
-    unsigned channel,
-    void (* dmaRead)(Bit8u *data_byte),
-    void (* dmaWrite)(Bit8u *data_byte),
-    const char *name
-    )
-{
-  if (channel > 3) {
-    BX_PANIC(("registerDMA8Channel: invalid channel number(%u).", channel));
-    return 0; // Fail.
-    }
-  if (bx_dma.s[0].chan[channel].used) {
-    BX_PANIC(("registerDMA8Channel: channel(%u) already in use.", channel));
-    return 0; // Fail.
-    }
-  BX_INFO(("channel %u used by %s", channel, name));
-  bx_dma.h[channel].dmaRead8  = dmaRead;
-  bx_dma.h[channel].dmaWrite8 = dmaWrite;
-  bx_dma.s[0].chan[channel].used = 1;
-  return 1; // OK.
-}
-
-  unsigned
-bx_dma_c::registerDMA16Channel(
-    unsigned channel,
-    void (* dmaRead)(Bit16u *data_word),
-    void (* dmaWrite)(Bit16u *data_word),
-    const char *name
-    )
-{
-  if ((channel < 4) || (channel > 7)) {
-    BX_PANIC(("registerDMA16Channel: invalid channel number(%u).", channel));
-    return 0; // Fail.
-    }
-  if (bx_dma.s[1].chan[channel & 0x03].used) {
-    BX_PANIC(("registerDMA16Channel: channel(%u) already in use.", channel));
-    return 0; // Fail.
-    }
-  BX_INFO(("channel %u used by %s", channel, name));
-  channel &= 0x03;
-  bx_dma.h[channel].dmaRead16  = dmaRead;
-  bx_dma.h[channel].dmaWrite16 = dmaWrite;
-  bx_dma.s[1].chan[channel].used = 1;
-  return 1; // OK.
-}
-
-  unsigned
-bx_dma_c::unregisterDMAChannel(unsigned channel)
-{
-  Boolean ma_sl = (channel > 3);
-  bx_dma.s[ma_sl].chan[channel & 0x03].used = 0;
-  BX_INFO(("channel %u no longer used", channel));
-  return 1;
-}
-
-  unsigned
-bx_dma_c::get_TC(void)
-{
-  return BX_DMA_THIS TC;
-}
-
 
   void
 bx_dma_c::init(bx_devices_c *d)
 {
   unsigned c;
-  BX_DEBUG(("Init $Id: dma.cc,v 1.19 2002-06-16 15:02:27 vruppert Exp $"));
+  BX_DEBUG(("Init $Id: dma.cc,v 1.17 2002-01-18 16:33:47 vruppert Exp $"));
 
   BX_DMA_THIS devices = d;
 
   /* 8237 DMA controller */
-
-  for (unsigned int i=0; i < 2; i++) {
-    for (unsigned int j=0; j < 4; j++) {
-      BX_DMA_THIS s[i].DRQ[j] = 0;
-      BX_DMA_THIS s[i].DACK[j] = 0;
-      }
-    }
-  BX_DMA_THIS HLDA = 0;
-  BX_DMA_THIS TC = 0;
 
   // 0000..000F
   unsigned i;
@@ -179,11 +109,8 @@ bx_dma_c::init(bx_devices_c *d)
       BX_DMA_THIS s[i].chan[c].base_count = 0;
       BX_DMA_THIS s[i].chan[c].current_count = 0;
       BX_DMA_THIS s[i].chan[c].page_reg = 0;
-      BX_DMA_THIS s[i].chan[c].used = 0;
       }
     }
-  BX_DMA_THIS s[1].chan[0].used = 1; // cascade channel in use
-  BX_INFO(("channel 4 used by cascade"));
 }
 
 
@@ -313,11 +240,21 @@ bx_dma_c::read( Bit32u   address, unsigned io_len)
     case 0x008c:
     case 0x008d:
     case 0x008e:
-      BX_DEBUG(("read: extra page register 0x%04x unsupported", (unsigned) address));
+      BX_ERROR(("read: extra page register 0x%04x unsupported", (unsigned) address));
       return(0);
 
-    default:
+    case 0x00d2:
+    case 0x00d4:
+    case 0x00d6:
+    case 0x00d8:
+    case 0x00dc:
+    case 0x00de:
       BX_ERROR(("read: unsupported address=%04x", (unsigned) address));
+      return(0);
+      break;
+
+    default:
+      BX_PANIC(("read: unsupported address=%04x", (unsigned) address));
       return(0);
     }
 }
@@ -361,7 +298,7 @@ bx_dma_c::write(Bit32u   address, Bit32u   value, unsigned io_len)
 
     BX_ERROR(("io write to address %08x, len=%u",
              (unsigned) address, (unsigned) io_len));
-    return;
+	return;
     }
 
   BX_DEBUG(("write: address=%04x value=%02x",
@@ -391,9 +328,9 @@ bx_dma_c::write(Bit32u   address, Bit32u   value, unsigned io_len)
       else { /* 2nd byte */
         BX_DMA_THIS s[ma_sl].chan[channel].base_address |= (value << 8);
         BX_DMA_THIS s[ma_sl].chan[channel].current_address |= (value << 8);
-        BX_DEBUG(("    base = %04x",
+          BX_DEBUG(("    base = %04x",
             (unsigned) BX_DMA_THIS s[ma_sl].chan[channel].base_address));
-        BX_DEBUG(("    curr = %04x",
+          BX_DEBUG(("    curr = %04x",
             (unsigned) BX_DMA_THIS s[ma_sl].chan[channel].current_address));
         }
       BX_DMA_THIS s[ma_sl].flip_flop = !BX_DMA_THIS s[ma_sl].flip_flop;
@@ -547,9 +484,9 @@ bx_dma_c::write(Bit32u   address, Bit32u   value, unsigned io_len)
       break;
 
     case 0x89: /* DMA-2 page register, channel 2 */
-    case 0x8a: /* DMA-2 page register, channel 3 */
-    case 0x8b: /* DMA-2 page register, channel 1 */
-    case 0x8f: /* DMA-2 page register, channel 0 */
+    case 0x8A: /* DMA-2 page register, channel 3 */
+    case 0x8B: /* DMA-2 page register, channel 1 */
+    case 0x8F: /* DMA-2 page register, channel 0 */
       /* address bits A16-A23 for DMA channel */
       channel = channelindex[address - 0x89];
       BX_DMA_THIS s[1].chan[channel].page_reg = value;
@@ -561,10 +498,10 @@ bx_dma_c::write(Bit32u   address, Bit32u   value, unsigned io_len)
     case 0x0085:
     case 0x0086:
     case 0x0088:
-    case 0x008c:
-    case 0x008d:
-    case 0x008e:
-      BX_DEBUG(("write: extra page register 0x%04x unsupported", (unsigned) address));
+    case 0x008C:
+    case 0x008D:
+    case 0x008E:
+      BX_ERROR(("write: extra page register 0x%04x unsupported", (unsigned) address));
       return;
       break;
 
@@ -575,21 +512,23 @@ bx_dma_c::write(Bit32u   address, Bit32u   value, unsigned io_len)
 }
 
   void
-bx_dma_c::set_DRQ(unsigned channel, Boolean val)
+bx_dma_c::DRQ(unsigned channel, Boolean val)
 {
   Bit32u dma_base, dma_roof;
   Boolean ma_sl;
 
-  if (channel > 7) {
-    BX_PANIC(("set_DRQ() channel > 7"));
-    return;
-  }
+#if BX_SUPPORT_SB16
+  if ( (channel != 2) && (channel != 4) &&
+       (channel != (unsigned) BX_SB16_DMAL) &&
+       (channel != (unsigned) BX_SB16_DMAH) )
+    BX_PANIC(("DRQ(): channel %d != 2 or 4 or %d (SB16) or %d (SB16)",
+	     channel, BX_SB16_DMAL, BX_SB16_DMAH));
+#else
+  if ( ( channel != 2 ) && ( channel != 4 ) )
+    BX_PANIC(("DRQ(): channel %d != 2 (floppy) or 4 (cascade)",
+	     channel));
+#endif
   ma_sl = (channel > 3);
-  BX_DMA_THIS s[ma_sl].DRQ[channel & 0x03] = val;
-  if (!BX_DMA_THIS s[ma_sl].chan[channel & 0x03].used) {
-    BX_PANIC(("set_DRQ(): channel %d not connected to device", channel));
-    return;
-  }
   channel &= 0x03;
   if (!val) {
     //BX_DEBUG(("bx_dma_c::DRQ(): val == 0"));
@@ -620,7 +559,7 @@ bx_dma_c::set_DRQ(unsigned channel, Boolean val)
   if ( (BX_DMA_THIS s[ma_sl].chan[channel].mode.mode_type != DMA_MODE_SINGLE) &&
        (BX_DMA_THIS s[ma_sl].chan[channel].mode.mode_type != DMA_MODE_DEMAND) &&
        (BX_DMA_THIS s[ma_sl].chan[channel].mode.mode_type != DMA_MODE_CASCADE) )
-    BX_PANIC(("set_DRQ: mode_type(%02x) not handled",
+    BX_PANIC(("DRQ: mode_type(%02x) not handled",
       (unsigned) BX_DMA_THIS s[ma_sl].chan[channel].mode.mode_type));
 
   dma_base = (BX_DMA_THIS s[ma_sl].chan[channel].page_reg << 16) |
@@ -650,7 +589,7 @@ bx_dma_c::control_HRQ(Boolean ma_sl)
     if (ma_sl) {
       bx_pc_system.set_HRQ(0);
     } else {
-      BX_DMA_THIS set_DRQ(4, 0);
+      bx_pc_system.set_DRQ(4, 0);
     }
     return;
   }
@@ -663,7 +602,7 @@ bx_dma_c::control_HRQ(Boolean ma_sl)
         bx_pc_system.set_HRQ(1);
       } else {
         // send DRQ to cascade channel of the master
-        BX_DMA_THIS set_DRQ(4, 1);
+        bx_pc_system.set_DRQ(4, 1);
       }
       break;
     }
@@ -671,14 +610,13 @@ bx_dma_c::control_HRQ(Boolean ma_sl)
 }
 
   void
-bx_dma_c::raise_HLDA(void)
+bx_dma_c::raise_HLDA(bx_pc_system_c *pc_sys)
 {
   unsigned channel;
   Bit32u phy_addr;
   Boolean count_expired = 0;
   Boolean ma_sl = 0;
 
-  BX_DMA_THIS HLDA = 1;
   // find highest priority channel
   for (channel=0; channel<4; channel++) {
     if ( (BX_DMA_THIS s[1].status_reg & (1 << (channel+4))) &&
@@ -688,7 +626,7 @@ bx_dma_c::raise_HLDA(void)
       }
     }
   if (channel == 0) { // master cascade channel
-    BX_DMA_THIS s[1].DACK[0] = 1;
+    bx_pc_system.set_DACK(channel + (ma_sl << 2), 1);
     for (channel=0; channel<4; channel++) {
       if ( (BX_DMA_THIS s[0].status_reg & (1 << (channel+4))) &&
            (BX_DMA_THIS s[0].mask[channel]==0) ) {
@@ -706,7 +644,7 @@ bx_dma_c::raise_HLDA(void)
   phy_addr = (BX_DMA_THIS s[ma_sl].chan[channel].page_reg << 16) |
              (BX_DMA_THIS s[ma_sl].chan[channel].current_address << ma_sl);
 
-  BX_DMA_THIS s[ma_sl].DACK[channel] = 1;
+  bx_pc_system.set_DACK(channel + (ma_sl << 2), 1);
   // check for expiration of count, so we can signal TC and DACK(n)
   // at the same time.
   if (BX_DMA_THIS s[ma_sl].chan[channel].mode.address_decrement==0)
@@ -718,7 +656,7 @@ bx_dma_c::raise_HLDA(void)
     // count expired, done with transfer
     // assert TC, deassert HRQ & DACK(n) lines
     BX_DMA_THIS s[ma_sl].status_reg |= (1 << channel); // hold TC in status reg
-    BX_DMA_THIS TC = 1;
+    bx_pc_system.set_TC(1);
     count_expired = 1;
     if (BX_DMA_THIS s[ma_sl].chan[channel].mode.autoinit_enable == 0) {
       // set mask bit if not in autoinit mode
@@ -734,67 +672,31 @@ bx_dma_c::raise_HLDA(void)
       }
     }
 
-  Bit8u data_byte;
-  Bit16u data_word;
-
   if (BX_DMA_THIS s[ma_sl].chan[channel].mode.transfer_type == 1) { // write
-    // DMA controlled xfer of byte from I/O to Memory
-
+    // xfer from I/O to Memory
     if (!ma_sl) {
-      if (BX_DMA_THIS h[channel].dmaWrite8)
-        BX_DMA_THIS h[channel].dmaWrite8(&data_byte);
-      else
-        BX_PANIC(("no dmaWrite handler for channel %u.", channel));
-
-      BX_MEM_WRITE_PHYSICAL(phy_addr, 1, &data_byte);
-
-      BX_DBG_DMA_REPORT(phy_addr, 1, BX_WRITE, data_byte);
+      pc_sys->dma_write8(phy_addr, channel, 0);
       }
     else {
-      if (BX_DMA_THIS h[channel].dmaWrite16)
-        BX_DMA_THIS h[channel].dmaWrite16(&data_word);
-      else
-        BX_PANIC(("no dmaWrite handler for channel %u.", channel));
-
-      BX_MEM_WRITE_PHYSICAL(phy_addr, 2, &data_word);
-
-      BX_DBG_DMA_REPORT(phy_addr, 2, BX_WRITE, data_word);
+      pc_sys->dma_write16(phy_addr, channel+4, 0);
       }
     }
   else if (BX_DMA_THIS s[ma_sl].chan[channel].mode.transfer_type == 2) { // read
-    // DMA controlled xfer of byte from Memory to I/O
-
+    // xfer from Memory to I/O
     if (!ma_sl) {
-      BX_MEM_READ_PHYSICAL(phy_addr, 1, &data_byte);
-
-      if (BX_DMA_THIS h[channel].dmaRead8)
-        BX_DMA_THIS h[channel].dmaRead8(&data_byte);
-
-      BX_DBG_DMA_REPORT(phy_addr, 1, BX_READ, data_byte);
+      pc_sys->dma_read8(phy_addr, channel);
       }
     else {
-      BX_MEM_READ_PHYSICAL(phy_addr, 2, &data_word);
-
-      if (BX_DMA_THIS h[channel].dmaRead16)
-        BX_DMA_THIS h[channel].dmaRead16(&data_word);
-
-      BX_DBG_DMA_REPORT(phy_addr, 2, BX_READ, data_word);
+      pc_sys->dma_read16(phy_addr, channel+4);
       }
     }
   else if (BX_DMA_THIS s[ma_sl].chan[channel].mode.transfer_type == 0) {
     // verify
-
     if (!ma_sl) {
-      if (BX_DMA_THIS h[channel].dmaWrite8)
-        BX_DMA_THIS h[channel].dmaWrite8(&data_byte);
-      else
-        BX_PANIC(("no dmaWrite handler for channel %u.", channel));
+      pc_sys->dma_write8(phy_addr, channel, 1);
       }
     else {
-      if (BX_DMA_THIS h[channel].dmaWrite16)
-        BX_DMA_THIS h[channel].dmaWrite16(&data_word);
-      else
-        BX_PANIC(("no dmaWrite handler for channel %u.", channel));
+      pc_sys->dma_write16(phy_addr, channel+4, 1);
       }
     }
   else {
@@ -802,13 +704,12 @@ bx_dma_c::raise_HLDA(void)
     }
 
   if (count_expired) {
-    BX_DMA_THIS TC = 0;            // clear TC, adapter card already notified
-    BX_DMA_THIS HLDA = 0;
+    bx_pc_system.set_TC(0);            // clear TC, adapter card already notified
     bx_pc_system.set_HRQ(0);           // clear HRQ to CPU
-    BX_DMA_THIS s[ma_sl].DACK[channel] = 0; // clear DACK to adapter card
+    bx_pc_system.set_DACK(channel + (ma_sl << 2), 0); // clear DACK to adapter card
     if (!ma_sl) {
-      BX_DMA_THIS set_DRQ(4, 0); // clear DRQ to cascade
-      BX_DMA_THIS s[1].DACK[0] = 0; // clear DACK to cascade
+      bx_pc_system.set_DRQ(4, 0); // clear DRQ to cascade
+      bx_pc_system.set_DACK(4, 0); // clear DACK to cascade
       }
     }
 }

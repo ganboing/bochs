@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: cpu.cc,v 1.32 2002-06-06 23:03:09 yakovlev Exp $
+// $Id: cpu.cc,v 1.25 2002-03-20 23:50:23 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -37,12 +37,7 @@
 
 //unsigned counter[2] = { 0, 0 };
 
-#if BX_FETCHDECODE_CACHE
-  static unsigned long bx_fdcache_sel;
-  static unsigned long bx_fdcache_ip;
 
-  static Bit32u new_phy_addr;
-#endif // BX_FETCHDECODE_CACHE
 
 #if BX_SIM_ID == 0   // only need to define once
 // This array defines a look-up table for the even parity-ness
@@ -111,15 +106,10 @@ extern void REGISTER_IADDR(Bit32u addr);
 BX_CPU_C::cpu_loop(Bit32s max_instr_count)
 {
   unsigned ret;
-  BxInstruction_t *i;
+  BxInstruction_t i;
   unsigned maxisize;
   Bit8u *fetch_ptr;
   Boolean is_32;
-
-#if !BX_FETCHDECODE_CACHE
-  BxInstruction_t bxinstruction_dummy;
-  i = &bxinstruction_dummy;
-#endif // #if BX_FETCHDECODE_CACHE
 
 #if BX_DEBUGGER
   BX_CPU_THIS_PTR break_point = 0;
@@ -224,96 +214,18 @@ async_events_processed:
     }
   fetch_ptr = BX_CPU_THIS_PTR fetch_ptr;
 
-#if BX_FETCHDECODE_CACHE
-  bx_fdcache_ip = new_phy_addr;
-  bx_fdcache_sel = bx_fdcache_ip & BX_FDCACHE_MASK;
-
-  i = &(BX_CPU_THIS_PTR fdcache_i[bx_fdcache_sel]);
-
-  if ((BX_CPU_THIS_PTR fdcache_ip[bx_fdcache_sel] == bx_fdcache_ip) &&
-      (BX_CPU_THIS_PTR fdcache_is32[bx_fdcache_sel] == is_32)) {
-    // HIT! ;^)
-    ret = 1; // success!
-    new_phy_addr += i->ilen;
-  } else {
-    // MISS :'(
-    if(BX_CPU_THIS_PTR fdcache_ip[bx_fdcache_sel] != 0xFFFFFFFF) {
-      Bit32u next_ptr=BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].next;
-      Bit32u prev_ptr=BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].prev;
-      if(next_ptr != 0xFFFFFFFF) {
-        BX_CPU_THIS_PTR fdcache_rpn_list[next_ptr].prev=prev_ptr;
-      }
-      if(prev_ptr != 0xFFFFFFFF) {
-        BX_CPU_THIS_PTR fdcache_rpn_list[prev_ptr].next=next_ptr;
-      } else {
-        Bit32u temp_rpn_sel = ((BX_CPU_THIS_PTR fdcache_ip[bx_fdcache_sel])>>12) & BX_FDCACHE_RPN_MASK;
-        BX_CPU_THIS_PTR fdcache_rpn_start[temp_rpn_sel] = next_ptr;
-      }
-    }
-#endif // #if BX_FETCHDECODE_CACHE
-
   maxisize = 16;
-  if (BX_CPU_THIS_PTR bytesleft < 16) {
+  if (BX_CPU_THIS_PTR bytesleft < 16)
     maxisize = BX_CPU_THIS_PTR bytesleft;
-    }
-  ret = FetchDecode(fetch_ptr, i, maxisize, is_32);
-
-#if BX_FETCHDECODE_CACHE
-    // The instruction straddles a page boundary.
-    // Not storing such instructions in the cache is probably the
-    //   easiest way to handle them  
-
-  //FIXME: These should not be necessary.
-    BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].next = 0xFFFFFFFF;
-    BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].prev = 0xFFFFFFFF;
-
-    if (ret) {
-      Bit32u rpn,rpn_sel,old_rpn;
-     //FIXME: Leaving because will be needed when above are removed.
-      BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].prev = 0xFFFFFFFF;
-      BX_CPU_THIS_PTR fdcache_ip[bx_fdcache_sel] = bx_fdcache_ip;
-      BX_CPU_THIS_PTR fdcache_is32[bx_fdcache_sel] = is_32;
-      new_phy_addr += i->ilen;
-
-      rpn=bx_fdcache_ip>>12;
-      rpn_sel=rpn & BX_FDCACHE_RPN_MASK;
-      old_rpn=BX_CPU_THIS_PTR fdcache_rpn[rpn_sel];
-
-      if(old_rpn == 0xFFFFFFFF) {
-        BX_CPU_THIS_PTR fdcache_rpn[rpn_sel] = rpn;
-        BX_CPU_THIS_PTR fdcache_rpn_start[rpn_sel] = bx_fdcache_sel;
-       //FIXME: Leaving because will be needed when above are removed.
-	BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].next=0xFFFFFFFF;
-      } else if (old_rpn != rpn) {
-        Bit32u index = BX_CPU_THIS_PTR fdcache_rpn_start[rpn_sel];
-        for(;index!=0xFFFFFFFF;index=BX_CPU_THIS_PTR fdcache_rpn_list[index].next) {
-          BX_CPU_THIS_PTR fdcache_ip[index] = 0xFFFFFFFF;
-        }
-        BX_CPU_THIS_PTR fdcache_rpn[rpn_sel] = rpn;
-        BX_CPU_THIS_PTR fdcache_rpn_start[rpn_sel] = bx_fdcache_sel;
-       //FIXME: Leaving because will be needed when above are removed.
-        BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].next=0xFFFFFFFF;
-
-      } else { // add to the head of the list
-        Bit32u index = BX_CPU_THIS_PTR fdcache_rpn_start[rpn_sel];
-        BX_CPU_THIS_PTR fdcache_rpn_list[bx_fdcache_sel].next=index;
-        BX_CPU_THIS_PTR fdcache_rpn_list[index].prev = bx_fdcache_sel;
-        BX_CPU_THIS_PTR fdcache_rpn_start[rpn_sel] = bx_fdcache_sel;
-      }
-    } else {
-      // Invalidate cache!
-      BX_CPU_THIS_PTR fdcache_ip[bx_fdcache_sel] = 0xFFFFFFFF;
-    }
-  }
-#endif // #if BX_FETCHDECODE_CACHE
+  ret = FetchDecode(fetch_ptr, &i, maxisize, is_32);
 
   if (ret) {
-    if (i->ResolveModrm) {
+    if (i.ResolveModrm) {
       // call method on BX_CPU_C object
-      BX_CPU_CALL_METHOD(i->ResolveModrm, (i));
+      BX_CPU_CALL_METHOD(i.ResolveModrm, (&i));
       }
-    BX_CPU_THIS_PTR fetch_ptr += i->ilen;
-    BX_CPU_THIS_PTR bytesleft -= i->ilen;
+    BX_CPU_THIS_PTR fetch_ptr += i.ilen;
+    BX_CPU_THIS_PTR bytesleft -= i.ilen;
 fetch_decode_OK:
 
 #if BX_DEBUGGER
@@ -327,34 +239,34 @@ fetch_decode_OK:
     }
 #endif
 
-    if (i->rep_used && (i->attr & BxRepeatable)) {
+    if (i.rep_used && (i.attr & BxRepeatable)) {
 repeat_loop:
-      if (i->attr & BxRepeatableZF) {
-        if (i->as_32) {
+      if (i.attr & BxRepeatableZF) {
+        if (i.as_32) {
           if (ECX != 0) {
-            BX_CPU_CALL_METHOD(i->execute, (i));
+            BX_CPU_CALL_METHOD(i.execute, (&i));
             ECX -= 1;
             }
-          if ((i->rep_used==0xf3) && (get_ZF()==0)) goto repeat_done;
-          if ((i->rep_used==0xf2) && (get_ZF()!=0)) goto repeat_done;
+          if ((i.rep_used==0xf3) && (get_ZF()==0)) goto repeat_done;
+          if ((i.rep_used==0xf2) && (get_ZF()!=0)) goto repeat_done;
           if (ECX == 0) goto repeat_done;
           goto repeat_not_done;
           }
         else {
           if (CX != 0) {
-            BX_CPU_CALL_METHOD(i->execute, (i));
+            BX_CPU_CALL_METHOD(i.execute, (&i));
             CX -= 1;
             }
-          if ((i->rep_used==0xf3) && (get_ZF()==0)) goto repeat_done;
-          if ((i->rep_used==0xf2) && (get_ZF()!=0)) goto repeat_done;
+          if ((i.rep_used==0xf3) && (get_ZF()==0)) goto repeat_done;
+          if ((i.rep_used==0xf2) && (get_ZF()!=0)) goto repeat_done;
           if (CX == 0) goto repeat_done;
           goto repeat_not_done;
           }
         }
       else { // normal repeat, no concern for ZF
-        if (i->as_32) {
+        if (i.as_32) {
           if (ECX != 0) {
-            BX_CPU_CALL_METHOD(i->execute, (i));
+            BX_CPU_CALL_METHOD(i.execute, (&i));
             ECX -= 1;
             }
           if (ECX == 0) goto repeat_done;
@@ -362,7 +274,7 @@ repeat_loop:
           }
         else { // 16bit addrsize
           if (CX != 0) {
-            BX_CPU_CALL_METHOD(i->execute, (i));
+            BX_CPU_CALL_METHOD(i.execute, (&i));
             CX -= 1;
             }
           if (CX == 0) goto repeat_done;
@@ -390,12 +302,12 @@ repeat_not_done:
 
 
 repeat_done:
-      BX_CPU_THIS_PTR eip += i->ilen;
+      BX_CPU_THIS_PTR eip += i.ilen;
       }
     else {
       // non repeating instruction
-      BX_CPU_THIS_PTR eip += i->ilen;
-      BX_CPU_CALL_METHOD(i->execute, (i));
+      BX_CPU_THIS_PTR eip += i.ilen;
+      BX_CPU_CALL_METHOD(i.execute, (&i));
       }
 
     BX_CPU_THIS_PTR prev_eip = EIP; // commit new EIP
@@ -498,22 +410,17 @@ static Bit8u FetchBuffer[16];
     for (; j<16; j++) {
       FetchBuffer[j] = *temp_ptr++;
       }
-    ret = FetchDecode(FetchBuffer, i, 16, is_32);
+    ret = FetchDecode(FetchBuffer, &i, 16, is_32);
     if (ret==0)
       BX_PANIC(("fetchdecode: cross boundary: ret==0"));
-    if (i->ResolveModrm) {
-      BX_CPU_CALL_METHOD(i->ResolveModrm, (i));
+    if (i.ResolveModrm) {
+      BX_CPU_CALL_METHOD(i.ResolveModrm, (&i));
       }
-    remain = i->ilen - remain;
+    remain = i.ilen - remain;
 
     // note: eip has already been advanced to beginning of page
     BX_CPU_THIS_PTR fetch_ptr = fetch_ptr + remain;
     BX_CPU_THIS_PTR bytesleft -= remain;
-
-    #if BX_FETCHDECODE_CACHE
-      new_phy_addr += remain;
-    #endif // BX_FETCHDECODE_CACHE
-
     //BX_CPU_THIS_PTR eip += remain;
     BX_CPU_THIS_PTR eip = BX_CPU_THIS_PTR prev_eip;
     goto fetch_decode_OK;
@@ -534,11 +441,7 @@ handle_async_event:
     BX_CPU_THIS_PTR inhibit_mask = 0; // clear inhibits for after resume
     // for one processor, pass the time as quickly as possible until
     // an interrupt wakes up the CPU.
-#if BX_DEBUGGER
-    while (bx_guard.interrupt_requested != 1) {
-#else
     while (1) {
-#endif
       if (BX_CPU_THIS_PTR INTR && BX_CPU_THIS_PTR eflags.if_) {
         break;
         }
@@ -562,9 +465,6 @@ handle_async_event:
       return;
     }
 #endif
-  } else if (BX_CPU_THIS_PTR kill_bochs_request) {
-    // setting kill_bochs_request causes the cpu loop to return ASAP.
-    return;
   }
 
 
@@ -696,9 +596,7 @@ BX_CPU_C::prefetch(void)
   // cs:eIP
   // prefetch QSIZE byte quantity aligned on corresponding boundary
   Bit32u new_linear_addr;
-#if !BX_FETCHDECODE_CACHE
   Bit32u new_phy_addr;
-#endif // !BX_FETCHDECODE_CACHE
   Bit32u temp_eip, temp_limit;
 
   temp_eip   = BX_CPU_THIS_PTR eip;
@@ -759,9 +657,7 @@ BX_CPU_C::prefetch(void)
 BX_CPU_C::revalidate_prefetch_q(void)
 {
   Bit32u new_linear_addr, new_linear_page, new_linear_offset;
-#if !BX_FETCHDECODE_CACHE
   Bit32u new_phy_addr;
-#endif // !BX_FETCHDECODE_CACHE
 
   new_linear_addr = BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.base + BX_CPU_THIS_PTR eip;
 

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: misc_mem.cc,v 1.19 2002-04-18 00:22:20 bdenney Exp $
+// $Id: misc_mem.cc,v 1.17 2001-11-14 01:39:22 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -77,7 +77,7 @@ BX_MEM_C::BX_MEM_C(size_t memsize)
 BX_MEM_C::~BX_MEM_C(void)
 {
   if (this-> vector != NULL) {
-    delete [] this->vector;
+    delete this->vector;
     }
   else {
     BX_DEBUG(("(%u)   memory not freed as it wasn't allocated!", BX_SIM_ID));
@@ -90,7 +90,7 @@ BX_MEM_C::~BX_MEM_C(void)
   void
 BX_MEM_C::init_memory(int memsize)
 {
-	BX_DEBUG(("Init $Id: misc_mem.cc,v 1.19 2002-04-18 00:22:20 bdenney Exp $"));
+	BX_DEBUG(("Init $Id: misc_mem.cc,v 1.17 2001-11-14 01:39:22 bdenney Exp $"));
   // you can pass 0 if memory has been allocated already through
   // the constructor, or the desired size of memory if it hasn't
 
@@ -137,19 +137,19 @@ BX_MEM_C::load_ROM(const char *path, Bit32u romaddress)
            );
   if (fd < 0) {
     BX_INFO(( "ROM: couldn't open ROM image file '%s'.", path));
-    BX_EXIT(1);
+    exit(1);
     }
   ret = fstat(fd, &stat_buf);
   if (ret) {
     BX_INFO(( "ROM: couldn't stat ROM image file '%s'.", path));
-    BX_EXIT(1);
+    exit(1);
     }
 
   size = stat_buf.st_size;
 
   if ( (romaddress + size) > BX_MEM_THIS len ) {
     BX_INFO(( "ROM: ROM address range > physical memsize!"));
-    BX_EXIT(1);
+    exit(1);
     }
 
   offset = 0;

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: logio.cc,v 1.18 2002-06-01 07:39:19 vruppert Exp $
+// $Id: logio.cc,v 1.16 2002-01-07 16:10:11 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -359,24 +359,11 @@ logfunctions::ldebug(const char *fmt, ...)
 void
 logfunctions::ask (int level, const char *prefix, const char *fmt, va_list ap)
 {
-  static char in_ask_already = 0;
   char buf1[1024], buf2[1024];
-  if (in_ask_already) {
-    fprintf (stderr, "logfunctions::ask() should not reenter!!\n");
-    return;
-  }
-  in_ask_already = 1;
   vsprintf (buf1, fmt, ap);
   sprintf (buf2, "%s %s", prefix, buf1);
   // FIXME: facility set to 0 because it's unknown.
-
-  // update vga screen.  This is useful because sometimes useful messages
-  // are printed on the screen just before a panic.  It's also potentially
-  // dangerous if this function calls ask again...  That's why I added
-  // the reentry check above.
-  if (SIM->get_init_done()) bx_vga.timer_handler(&bx_vga);
-
-  int val = SIM->log_msg (prefix, level, buf2);
+  int val = SIM->LOCAL_log_msg (prefix, level, buf2);
   switch (val)
   {
     case 0:   // user chose continue
@@ -386,7 +373,6 @@ logfunctions::ask (int level, const char *prefix, const char *fmt, va_list ap)
       break;
     case 2:   // user chose die
       fatal (prefix, fmt, ap);
-      break;
     case 3: // user chose abort
       fprintf (stderr, "User chose to dump core...\n");
 #if BX_HAVE_ABORT
@@ -412,9 +398,8 @@ logfunctions::ask (int level, const char *prefix, const char *fmt, va_list ap)
     default:
       // this happens if panics happen before the callback is initialized
       // in gui/control.cc.
-      fprintf (stderr, "WARNING: log_msg returned unexpected value %d\n", val);
+      fprintf (stderr, "WARNING: LOCAL_log_msg returned unexpected value %d\n", val);
   }
-  in_ask_already = 0;
 }
 
 void
@@ -439,7 +424,7 @@ logfunctions::fatal (const char *prefix, const char *fmt, va_list ap)
   fgets (buf, 8, stdin);
 #endif
 #if !BX_DEBUGGER
-  BX_EXIT(1);
+  exit(1);
 #else
   static Boolean dbg_exit_called = 0;
   if (dbg_exit_called == 0) {

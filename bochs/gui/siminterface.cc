@@ -1,14 +1,14 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: siminterface.cc,v 1.41 2002-04-23 07:44:34 cbothamy Exp $
+// $Id: siminterface.cc,v 1.39 2002-01-30 10:30:52 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 /*
  * gui/siminterface.cc
- * $Id: siminterface.cc,v 1.41 2002-04-23 07:44:34 cbothamy Exp $
+ * $Id: siminterface.cc,v 1.39 2002-01-30 10:30:52 cbothamy Exp $
  *
  * Defines the actual link between bx_simulator_interface_c methods
  * and the simulator.  This file includes bochs.h because it needs
- * access to bx_options and other simulator objects and methods.
+ * access to bx_options and other simulator objecst and methods.
  *
  */
 
@@ -18,23 +18,10 @@ bx_simulator_interface_c *SIM = NULL;
 logfunctions *siminterface_log = NULL;
 #define LOG_THIS siminterface_log->
 
-// bx_simulator_interface just defines the interface that the Bochs simulator
-// and the gui will use to talk to each other.  None of the methods of
-// bx_simulator_interface are implemented; they are all virtual.  The
-// bx_real_sim_c class is a child of bx_simulator_interface_c, and it
-// implements all the methods.  The idea is that a gui needs to know only
-// definition of bx_simulator_interface to talk to Bochs.  The gui should
-// not need to include bochs.h.  
-//
-// I made this separation to ensure that all guis use the siminterface to do
-// access bochs internals, instead of accessing things like
-// bx_keyboard.s.internal_buffer[4] (or whatever) directly. -Bryce
-// 
-
 class bx_real_sim_c : public bx_simulator_interface_c {
   sim_interface_callback_t callback;
-  void *callback_ptr;
 #define BX_NOTIFY_MAX_ARGS 10
+  int notify_return_val;
   int notify_int_args[BX_NOTIFY_MAX_ARGS];
   char *notify_string_args[BX_NOTIFY_MAX_ARGS];
 #define NOTIFY_TYPE_INT
@@ -48,10 +35,6 @@ public:
   virtual ~bx_real_sim_c ();
   virtual int get_init_done () { return init_done; }
   virtual int set_init_done (int n) { init_done = n; return 0;}
-  virtual void get_param_id_range (int *min, int *max) {
-    *min = BXP_NULL;
-    *max = BXP_THIS_IS_THE_LAST-1;
-  }
   virtual int register_param (bx_id id, bx_param_c *it);
   virtual bx_param_c *get_param (bx_id id);
   virtual bx_param_num_c *get_param_num (bx_id id);
@@ -63,7 +46,7 @@ public:
   virtual char *get_action_name (int action);
   virtual const char *get_log_level_name (int level);
   virtual int get_max_log_level ();
-  virtual void quit_sim (int code);
+  virtual void quit_sim (int clean);
   virtual int get_default_rc (char *path, int len);
   virtual int read_rc (char *path);
   virtual int write_rc (char *path, int overwrite);
@@ -72,16 +55,13 @@ public:
   virtual int get_floppy_options (int drive, bx_floppy_options *out);
   virtual int get_cdrom_options (int drive, bx_cdrom_options *out);
   virtual char *get_floppy_type_name (int type);
-  virtual void set_notify_callback (sim_interface_callback_t func, void *arg);
-  virtual BxEvent* sim_to_gui_event (BxEvent *event);
-  virtual int log_msg (const char *prefix, int level, char *msg);
-  virtual int ask_param (bx_id which);
+  virtual void set_notify_callback (sim_interface_callback_t func);
+  virtual int notify_return (int retcode);
+  virtual int LOCAL_notify (int code);
+  virtual int LOCAL_log_msg (const char *prefix, int level, char *msg);
+  virtual int log_msg_2 (char *prefix, int *level, char *msg, int len);
   virtual int get_enabled () { return enabled; }
   virtual void set_enabled (int enabled) { this->enabled = enabled; }
-  // ask the user for a pathname
-  virtual int ask_filename (char *filename, int maxlen, char *prompt, char *the_default, int flags);
-  // called at a regular interval, currently by the keyboard handler.
-  virtual void periodic ();
 };
 
 bx_param_c *
@@ -90,8 +70,8 @@ bx_real_sim_c::get_param (bx_id id)
   BX_ASSERT (id >= BXP_NULL && id < BXP_THIS_IS_THE_LAST);
   int index = (int)id - BXP_NULL;
   bx_param_c *retval = param_registry[index];
-  if (!retval) 
-    BX_INFO (("get_param can't find id %u", id));
+  if (!retval)
+    BX_PANIC (("get_param can't find id %u", id));
   return retval;
 }
 
@@ -122,7 +102,7 @@ bx_real_sim_c::get_param_string (bx_id id) {
   return NULL;
 }
 
-void bx_init_siminterface ()
+void init_siminterface ()
 {
   siminterface_log = new logfunctions ();
   siminterface_log->put ("CTRL");
@@ -138,24 +118,16 @@ bx_simulator_interface_c::bx_simulator_interface_c ()
 bx_real_sim_c::bx_real_sim_c ()
 {
   callback = NULL;
-  callback_ptr = NULL;
-  
-  enabled = 1;
-  int i;
-  for (i=0; i<BX_NOTIFY_MAX_ARGS; i++) {
+  notify_return_val = -1;
+  for (int i=0; i<BX_NOTIFY_MAX_ARGS; i++) {
     notify_int_args[i] = -1;
     notify_string_args[i] = NULL;
   }
   init_done = 0;
   registry_alloc_size = BXP_THIS_IS_THE_LAST - BXP_NULL;
   param_registry = new bx_param_c*  [registry_alloc_size];
-  for (i=0; i<registry_alloc_size; i++)
-    param_registry[i] = NULL;
 }
 
-// called by constructor of bx_param_c, so that every parameter that is
-// initialized gets registered.  This builds a list of all parameters
-// which can be used to look them up by number (get_param).
 bx_real_sim_c::~bx_real_sim_c ()
 {
     if ( param_registry != NULL )
@@ -168,12 +140,8 @@ bx_real_sim_c::~bx_real_sim_c ()
 int
 bx_real_sim_c::register_param (bx_id id, bx_param_c *it)
 {
-  if (id == BXP_NULL) return 0;
   BX_ASSERT (id >= BXP_NULL && id < BXP_THIS_IS_THE_LAST);
   int index = (int)id - BXP_NULL;
-  if (this->param_registry[index] != NULL) {
-    BX_INFO (("register_param is overwriting parameter id %d", id));
-  }
   this->param_registry[index] = it;
   return 0;
 }
@@ -224,34 +192,10 @@ bx_real_sim_c::get_max_log_level ()
 }
 
 void 
-bx_real_sim_c::quit_sim (int code) {
-#if 0
-  if (!code)
-    BX_PANIC (("Quit simulation command"));
-  // tell bochs to shut down (includes vga screen)
-  bx_atexit ();
-  // tell the control panel to shut down
-  BxEvent *event = new BxEvent ();
-  event->type = BX_ASYNC_EVT_SHUTDOWN_GUI;
-  sim_to_gui_event (event);
-  // set something that will cause the cpu loop to exit.
-  // or use setjmp/longjmp, or something.
-  //FIXME!
-#endif
-  BX_INFO (("quit_sim called"));
-#if BX_WITH_WX
-  // in wxWindows, the whole simulator is running in a separate thread.
-  // our only job is to end the thread as soon as possible, NOT to shut
-  // down the whole application with an exit.
-  BX_CPU_THIS_PTR async_event = 1;
-  BX_CPU_THIS_PTR kill_bochs_request = 1;
-  // the cpu loop will exit very soon after this condition is set.
-#else
-  // just a single thread.  Use exit() to stop the application.
-  if (!code)
+bx_real_sim_c::quit_sim (int clean) {
+  if (!clean)
     BX_PANIC (("Quit simulation command"));
   ::exit (0);
-#endif
 }
 
 int
@@ -317,7 +261,7 @@ int n_floppy_bootdisk_names = 3;
 char *loader_os_names[] = { "none", "linux", "nullkernel", NULL };
 int n_loader_os_names = 3;
 char *keyboard_type_names[] = { "xt", "at", "mf", NULL };
-int n_keyboard_type_names = 3;
+int n_keyboard_tupe_names = 3;
 
 char *
 bx_real_sim_c::get_floppy_type_name (int type)
@@ -328,35 +272,54 @@ bx_real_sim_c::get_floppy_type_name (int type)
 }
 
 void 
-bx_real_sim_c::set_notify_callback (sim_interface_callback_t func, void *arg)
+bx_real_sim_c::set_notify_callback (sim_interface_callback_t func)
 {
   callback = func;
-  callback_ptr = arg;
 }
 
-BxEvent *
-bx_real_sim_c::sim_to_gui_event (BxEvent *event)
+int 
+bx_real_sim_c::notify_return (int retcode)
+{
+  notify_return_val = retcode;
+  return 0;
+}
+
+int
+bx_real_sim_c::LOCAL_notify (int code)
 {
   if (callback == NULL) {
     BX_ERROR (("notify called, but no callback function is registered"));
-    return NULL;
+    return -1;
   } else {
-    return (*callback)(callback_ptr, event);
+    notify_return_val = -999;
+    (*callback)(code);
+    if (notify_return_val == -999)
+      BX_ERROR (("notify callback returned without setting the return value"));
+    return notify_return_val;
   }
 }
 
 // returns 0 for continue, 1 for alwayscontinue, 2 for die.
 int 
-bx_real_sim_c::log_msg (const char *prefix, int level, char *msg)
+bx_real_sim_c::LOCAL_log_msg (const char *prefix, int level, char *msg)
 {
-  BxEvent *be = new BxEvent ();
-  be->type = BX_ASYNC_EVT_LOG_MSG;
-  be->u.logmsg.prefix = (char *)prefix;
-  be->u.logmsg.level = level;
-  be->u.logmsg.msg = msg;
   //fprintf (stderr, "calling notify.\n");
-  BxEvent *response = sim_to_gui_event (be);
-  return response? response->retcode : -1;
+  notify_string_args[0] = strdup(prefix);
+  notify_int_args[1] = level;
+  notify_string_args[2] = msg;
+  int val = LOCAL_notify (NOTIFY_CODE_LOGMSG);
+  //fprintf (stderr, "notify returned %d\n", val);
+  return val;
+}
+
+// called by control.cc
+int
+bx_real_sim_c::log_msg_2 (char *prefix, int *level, char *msg, int len)
+{
+  strncpy (prefix, notify_string_args[0], len);
+  *level= notify_int_args[1];
+  strncpy (msg, notify_string_args[2], len);
+  return 0;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -369,8 +332,8 @@ bx_object_c::bx_object_c (bx_id id)
   this->type = BXT_OBJECT;
 }
 
-void
-bx_object_c::set_type (bx_objtype type)
+void 
+bx_object_c::set_type (Bit8u type)
 {
   this->type = type;
 }
@@ -494,16 +457,6 @@ bx_param_string_c::bx_param_string_c (bx_id id,
   this->options = new bx_param_num_c (BXP_NULL,
       "stringoptions", NULL, 0, BX_MAX_INT, 0);
   set (initial_val);
-}
-
-bx_param_filename_c::bx_param_filename_c (bx_id id,
-    char *name,
-    char *description,
-    char *initial_val,
-    int maxsize)
-  : bx_param_string_c (id, name, description, initial_val, maxsize)
-{
-  get_options()->set (BX_IS_FILENAME);
 }
 
 bx_param_string_c::~bx_param_string_c ()
@@ -654,63 +607,4 @@ void
 bx_list_c::set_parent (bx_param_c *parent)
 {
   this->parent = parent;
-}
-
-// Called by simulator whenever it needs the user to choose a new value
-// for a registered parameter.  Create a synchronous ASK_PARAM event, 
-// send it to the GUI, and wait for the response.  The GUI will call the
-// set() method on the parameter if the user changes the value.
-int 
-bx_real_sim_c::ask_param (bx_id param)
-{
-  bx_param_c *paramptr = SIM->get_param(param);
-  BX_ASSERT (paramptr != NULL);
-  // create appropriate event
-  BxEvent *event = new BxEvent ();
-  event->type = BX_SYNC_EVT_ASK_PARAM;
-  event->u.param.param = paramptr;
-  BxEvent *response = sim_to_gui_event (event);
-  return response->retcode;
-}
-
-int
-bx_real_sim_c::ask_filename (char *filename, int maxlen, char *prompt, char *the_default, int flags)
-{
-  // implement using ASK_PARAM on a newly created param.  I can't use
-  // ask_param because I don't intend to register this param.
-  BxEvent event;
-  bx_param_string_c param (BXP_NULL, "filename", prompt, the_default, maxlen);
-  flags |= param.BX_IS_FILENAME;
-  param.get_options()->set (flags);
-  event.type = BX_SYNC_EVT_ASK_PARAM;
-  event.u.param.param = &param;
-  BxEvent *response = sim_to_gui_event (&event);
-  BX_ASSERT ((response == &event));
-  if (event.retcode >= 0)
-    memcpy (filename, param.getptr(), maxlen);
-  return event.retcode;
-}
-
-void
-bx_real_sim_c::periodic ()
-{
-  // give the GUI a chance to do periodic things on the bochs thread. in 
-  // particular, notice if the thread has been asked to die.
-  BxEvent *tick = new BxEvent ();
-  tick->type = BX_SYNC_EVT_TICK;
-  BxEvent *response = sim_to_gui_event (tick);
-  int retcode = response->retcode;
-  BX_ASSERT (response == tick);
-  delete tick;
-  if (retcode < 0) {
-    BX_INFO (("Bochs thread has been asked to quit."));
-    quit_sim (0);
-  }
-#if 0
-  // watch for memory leaks.  Allocate a small block of memory, print the
-  // pointer that is returned, then free.
-  BxEvent *memcheck = new BxEvent ();
-  BX_INFO(("memory allocation at %p", memcheck));
-  delete memcheck;
-#endif
 }

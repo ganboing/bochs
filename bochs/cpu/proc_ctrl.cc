@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: proc_ctrl.cc,v 1.21 2002-04-11 01:19:24 instinc Exp $
+// $Id: proc_ctrl.cc,v 1.18 2002-03-27 16:04:05 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -547,7 +547,7 @@ BX_CPU_C::MOV_RdCd(BxInstruction_t *i)
     }
 
   if (protected_mode() && CPL!=0) {
-//    BX_PANIC(("MOV_RdCd: CPL!=0"));
+    BX_PANIC(("MOV_RdCd: CPL!=0"));
     /* #GP(0) if CPL is not 0 */
     exception(BX_GP_EXCEPTION, 0, 0);
     return;
@@ -1270,7 +1270,7 @@ BX_CPU_C::WRMSR(BxInstruction_t *i)
 		*/
 
 		case BX_MSR_APICBASE:
-			BX_CPU_THIS_PTR msr.apicbase = ((Bit64u)EDX << 32) + EAX;
+			BX_CPU_THIS_PTR msr.apicbase = (EDX << 32) + EAX;
 			BX_INFO(("WRMSR: wrote %08x:%08x to MSR_APICBASE", EDX, EAX));
 			return;
 			

@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: bochs.h,v 1.65 2002-06-16 15:02:27 vruppert Exp $
+// $Id: bochs.h,v 1.61 2002-03-26 13:59:35 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (C) 2002  MandrakeSoft S.A.
+//  Copyright (C) 2001  MandrakeSoft S.A.
 //
 //    MandrakeSoft S.A.
 //    43, rue d'Aboukir
@@ -132,28 +132,14 @@ extern "C" {
 // #define BX_OUTP(addr, val, len)  bx_pc_system.outp(addr, val, len)
 #define BX_INP(addr, len)           bx_devices.inp(addr, len)
 #define BX_OUTP(addr, val, len)     bx_devices.outp(addr, val, len)
+#define BX_HRQ                      (bx_pc_system.HRQ)
+#define BX_RAISE_HLDA()             bx_pc_system.raise_HLDA()
 #define BX_TICK1()                  bx_pc_system.tick1()
 #define BX_TICKN(n)                 bx_pc_system.tickn(n)
 #define BX_INTR                     bx_pc_system.INTR
 #define BX_SET_INTR(b)              bx_pc_system.set_INTR(b)
 #define BX_CPU_C                    bx_cpu_c
 #define BX_MEM_C                    bx_mem_c
-// macros for DMA handling
-#define BX_REGISTER_DMA8_CHANNEL(channel, dmaRead, dmaWrite, name) \
-  bx_dma.registerDMA8Channel(channel, dmaRead, dmaWrite, name)
-#define BX_REGISTER_DMA16_CHANNEL(channel, dmaRead, dmaWrite, name) \
-  bx_dma.registerDMA16Channel(channel, dmaRead, dmaWrite, name)
-#define BX_UNREGISTER_DMA_CHANNEL(channel) \
-  bx_dma.unregisterDMAChannel(channel)
-#define BX_DMA_SET_DRQ(channel, val) bx_dma.set_DRQ(channel, val)
-#define BX_DMA_GET_TC()             bx_dma.get_TC()
-#define BX_HRQ                      (bx_pc_system.HRQ)
-#define BX_RAISE_HLDA()             bx_dma.raise_HLDA()
-#define BX_MEM_READ_PHYSICAL(phy_addr, len, ptr) \
-  BX_MEM(0)->read_physical(BX_CPU(0), phy_addr, len, ptr)
-#define BX_MEM_WRITE_PHYSICAL(addr, len, ptr) \
-  BX_MEM(0)->write_physical(BX_CPU(0), phy_addr, len, ptr)
-
 #if BX_SMP_PROCESSORS==1
 #define BX_CPU(x)                   (&bx_cpu)
 #define BX_MEM(x)                   (&bx_mem)
@@ -235,6 +221,13 @@ extern Bit8u DTPageDirty[];
 #endif
 
 #define MAGIC_LOGNUM 0x12345678
+
+// Log Level defines
+#define LOGLEV_DEBUG 0
+#define LOGLEV_INFO  1
+#define LOGLEV_ERROR 2
+#define LOGLEV_PANIC 3
+#define N_LOGLEV   4
 
 typedef class logfunctions {
 	char *prefix;
@@ -470,7 +463,7 @@ typedef struct {
 
 #define BX_ASSERT(x) do {if (!(x)) BX_PANIC(("failed assertion \"%s\" at %s:%d\n", #x, __FILE__, __LINE__));} while (0)
 void bx_signal_handler (int signum);
-int bx_atexit(void);
+void bx_atexit(void);
 extern bx_debug_t bx_dbg;
 
 
@@ -523,8 +516,6 @@ extern bx_devices_c   bx_devices;
 #define BX_RESET_SOFTWARE 10
 #define BX_RESET_HARDWARE 11
 
-void bx_init_before_control_panel ();
-
 // This value controls how often each I/O device's periodic() method
 // gets called.  The timer is set up in iodev/devices.cc.
 #define BX_IODEV_HANDLER_PERIOD 100    // microseconds
@@ -568,7 +559,6 @@ typedef struct {
   bx_param_string_c *Omacaddr;
   bx_param_string_c *Oethmod;
   bx_param_string_c *Oethdev;
-  bx_param_string_c *Oscript;
   } bx_ne2k_options;
 
 typedef struct {
@@ -634,8 +624,7 @@ typedef struct {
   bx_parport_options par1; // parallel port #1
   bx_parport_options par2; // parallel port #2  (not implemented)
   bx_sb16_options   sb16;
-  bx_param_num_c    *Obootdrive;  
-  bx_param_bool_c   *OfloppySigCheck;
+  bx_param_num_c    *Obootdrive;  //0=floppya, 0x80=diskc
   bx_param_num_c    *Ovga_update_interval;
   bx_param_num_c    *Okeyboard_serial_delay;
   bx_param_num_c    *Okeyboard_paste_delay;

@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: iodev.h,v 1.14 2002-06-16 15:02:27 vruppert Exp $
+// $Id: iodev.h,v 1.11 2001-12-18 13:12:45 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (C) 2002  MandrakeSoft S.A.
+//  Copyright (C) 2001  MandrakeSoft S.A.
 //
 //    MandrakeSoft S.A.
 //    43, rue d'Aboukir
@@ -38,7 +38,6 @@
 #define BX_NO_IRQ  -1
 
 
-class bx_biosdev_c;
 class bx_pit_c;
 class bx_keyb_c;
 class bx_dma_c;
@@ -81,18 +80,23 @@ public:
   ~bx_devices_c(void);
   void init(BX_MEM_C *);
   BX_MEM_C *mem;  // address space associated with these devices
-  Boolean register_io_read_handler(void *this_ptr, bx_read_handler_t f, Bit32u addr, const char *name );
-  Boolean register_io_write_handler(void *this_ptr, bx_write_handler_t f, Bit32u addr, const char *name );
-  Boolean register_irq(unsigned irq, const char *name);
-  Boolean unregister_irq(unsigned irq, const char *name);
+  void register_io_read_handler(void *this_ptr, bx_read_handler_t f, Bit32u addr, const char *name );
+  void register_io_write_handler(void *this_ptr, bx_write_handler_t f, Bit32u addr, const char *name );
+  void register_irq(unsigned irq, const char *name);
+  void unregister_irq(unsigned irq, const char *name);
   void iodev_init(void);
   Bit32u inp(Bit16u addr, unsigned io_len);
   void   outp(Bit16u addr, Bit32u value, unsigned io_len);
 
+  void dma_write8(unsigned channel, Bit8u *data);
+  void dma_read8(unsigned channel, Bit8u *data);
+  void dma_write16(unsigned channel, Bit16u *data);
+  void dma_read16(unsigned channel, Bit16u *data);
+  void drq(unsigned channel, Boolean val);
+  void raise_hlda(void);
   static void timer_handler(void *);
   void timer(void);
 
-  bx_biosdev_c     *biosdev;
   bx_ioapic_c      *ioapic;
   bx_pci_c         *pci;
   bx_pit_c         *pit;
@@ -153,7 +157,6 @@ private:
 #if BX_SUPPORT_APIC
 #  include "iodev/ioapic.h"
 #endif
-#include "iodev/biosdev.h"
 #include "iodev/cmos.h"
 #include "iodev/dma.h"
 #include "iodev/floppy.h"

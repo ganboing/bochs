@@ -1,10 +1,10 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: control.cc,v 1.47 2002-04-18 00:22:19 bdenney Exp $
+// $Id: control.cc,v 1.44 2002-03-26 14:46:02 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 /*
  * gui/control.cc
- * $Id: control.cc,v 1.47 2002-04-18 00:22:19 bdenney Exp $
+ * $Id: control.cc,v 1.44 2002-03-26 14:46:02 bdenney Exp $
  *
  * This is code for a text-mode control panel.  Note that this file
  * does NOT include bochs.h.  Instead, it does all of its contact with
@@ -345,7 +345,7 @@ static char *runtime_menu_prompt =
 "11. Continue simulation\n"
 "12. Quit now\n"
 "\n"
-"Please choose one:  [11] ";
+"Please choose one:  [10] ";
 
 char *menu_prompt_list[BX_CPANEL_N_MENUS] = {
   ask_about_control_panel,
@@ -614,32 +614,24 @@ int bx_write_rc (char *rc)
 char *log_action_ask_choices[] = { "cont", "alwayscont", "die", "abort", "debug" };
 int log_action_n_choices = 4 + (BX_DEBUGGER?1:0);
 
-BxEvent *
-control_panel_notify_callback (void *unused, BxEvent *event)
+int control_panel_notify_callback (int code)
 {
-  event->retcode = -1;
-  switch (event->type)
+  switch (code)
   {
-    case BX_SYNC_EVT_TICK:
-      event->retcode = 0;
-      return event;
-    case BX_SYNC_EVT_ASK_PARAM:
-      fprintf (stderr, "BX_SYNC_EVT_ASK_PARAM\n");
-      return event;
-    case BX_ASYNC_EVT_SHUTDOWN_GUI:
-      fprintf (stderr, "BX_ASYNC_EVT_SHUTDOWN_GUI\n");
-      return event;
-    case BX_ASYNC_EVT_LOG_MSG:
+  case NOTIFY_CODE_LOGMSG:
     {
-      int level = event->u.logmsg.level;
+      int level;
+      char prefix[512], msg[512];
+	  int retval = SIM->log_msg_2 (prefix, &level, msg, sizeof(msg)) >= 0;
+      assert (retval);
       fprintf (stderr, "========================================================================\n");
       fprintf (stderr, "Event type: %s\n", SIM->get_log_level_name (level));
-      fprintf (stderr, "Device: %s\n", event->u.logmsg.prefix);
-      fprintf (stderr, "Message: %s\n\n", event->u.logmsg.msg);
+      fprintf (stderr, "Device: %s\n", prefix);
+      fprintf (stderr, "Message: %s\n\n", msg);
       fprintf (stderr, "A %s has occurred.  Do you want to:\n", SIM->get_log_level_name (level));
       fprintf (stderr, "  cont       - continue execution\n");
       fprintf (stderr, "  alwayscont - continue execution, and don't ask again.\n");
-      fprintf (stderr, "               This affects only %s events from device %s\n", SIM->get_log_level_name (level), event->u.logmsg.prefix);
+      fprintf (stderr, "               This affects only %s events from device %s\n", SIM->get_log_level_name (level), prefix);
       fprintf (stderr, "  die        - stop execution now\n");
       fprintf (stderr, "  abort      - dump core %s\n", 
 	  BX_HAVE_ABORT ? "" : "(Disabled)");
@@ -650,24 +642,22 @@ control_panel_notify_callback (void *unused, BxEvent *event)
 ask:
       if (ask_menu ("Choose one of the actions above: [%s] ", 
 	    log_action_n_choices, log_action_ask_choices, 2, &choice) < 0) 
-	event->retcode = -1;
+	return SIM->notify_return(-1);
       // return 0 for continue, 1 for alwayscontinue, 2 for die, 3 for debug.
       if (!BX_HAVE_ABORT && choice==3) goto ask;
-      fflush(stdout);
-      fflush(stderr);
-      event->retcode = choice;
+      SIM->notify_return(choice);
     }
-    return event;
+    break;
   default:
-    fprintf (stderr, "Control panel: notify callback called with event type %04x\n", event->type);
-    return event;
+    fprintf (stderr, "Control panel: notify callback called with unknown code %04x\n", code);
   }
-  assert (0); // switch statement should return
+  // error if we fall through the case
+  return -1;
 }
 
 void bx_control_panel_init () {
   //fprintf (stderr, "bx_control_panel_init()\n");
-  SIM->set_notify_callback (control_panel_notify_callback, NULL);
+  SIM->set_notify_callback (control_panel_notify_callback);
 }
 
 /////////////////////////////////////////////////////////////////////
