@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: dbg_main.cc,v 1.43 2002-04-18 00:22:19 bdenney Exp $
+// $Id: dbg_main.cc,v 1.41 2002-03-20 04:09:26 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -285,7 +285,7 @@ bx_dbg_main(int argc, char *argv[])
       BX_ERROR(( "%s: -rc option used, but no path specified.",
         argv[0] ));
       bx_dbg_usage();
-      BX_EXIT(1);
+      exit(1);
       }
     strncpy(bx_debug_rc_fname, argv[2], BX_MAX_PATH-1);
     i += 2; // skip past "-rc" and filename
@@ -2189,9 +2189,9 @@ for (sim=0; sim<BX_SMP_PROCESSORS; sim++) {
 	fprintf(stderr, "(%u) Caught vm mode switch breakpoint to %s mode\n",
 		sim, BX_CPU(sim)->eflags.vm ? "virtual 86" : "protected");
   } else if (BX_CPU(sim)->stop_reason == STOP_READ_WATCH_POINT) {
-	fprintf(stderr, "(%u) Caught read watch point at %08X\n", sim, BX_CPU(sim)->watchpoint);
+	fprintf(stderr, "(%u) Caught read watch point\n", sim);
   } else if (BX_CPU(sim)->stop_reason == STOP_WRITE_WATCH_POINT) {
-	fprintf(stderr, "(%u) Caught write watch point at %08X\n", sim, BX_CPU(sim)->watchpoint);
+	fprintf(stderr, "(%u) Caught write watch point\n", sim);
   }
   else {
     fprintf(stderr, "Error: (%u) print_guard_results: guard_found ? (stop reason %u)\n", 

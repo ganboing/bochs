@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: macintosh.cc,v 1.13 2002-04-20 07:19:35 vruppert Exp $
+// $Id: macintosh.cc,v 1.12 2002-03-16 11:30:06 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -801,19 +801,17 @@ void bx_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
 	Rect			destRect;
 	RGBColor	fgColor, bgColor;
 	GrafPtr		oldPort;
-	unsigned nchars, ncols;
+	unsigned nchars;
 	
 	GetPort(&oldPort);
 	
 	SetPort(win);
 
-	ncols = width/8;
-
-	//current cursor position
-	cursori = (cursor_y*ncols + cursor_x)*2;
+//current cursor position
+	cursori = (cursor_y*80 + cursor_x)*2;
 
 	// Number of characters on screen, variable number of rows
-	nchars = ncols*nrows;
+	nchars = 80*nrows;
 	
 	for (i=0; i<nchars*2; i+=2)
 	{
@@ -841,8 +839,8 @@ void bx_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
 				RGBBackColor(&bgColor);
 			}
 			
-			x = ((i/2) % ncols)*FONT_WIDTH;
-			y = ((i/2) / ncols)*FONT_HEIGHT;
+			x = ((i/2) % 80)*FONT_WIDTH;
+			y = ((i/2) / 80)*FONT_HEIGHT;
 
 			SetRect(&destRect, x, y,
 				x+FONT_WIDTH, y+FONT_HEIGHT);
@@ -969,13 +967,8 @@ void bx_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0)
 // x: new VGA x size
 // y: new VGA y size (add headerbar_y parameter from ::specific_init().
 
-void bx_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight)
+void bx_gui_c::dimension_update(unsigned x, unsigned y)
 {
-  if (fheight > 0) {
-    if (fheight != 16) {
-      y = y * 16 / fheight;
-    }
-  }
 	if (x != width || y != height)
 	{
 		SizeWindow(win, x, y, false);

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: cdrom_amigaos.cc,v 1.4 2002-05-28 15:39:05 vruppert Exp $
+// $Id: cdrom_amigaos.cc,v 1.3 2001-10-03 13:10:38 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2000  MandrakeSoft S.A.
@@ -115,7 +115,7 @@ cdrom_interface::~cdrom_interface(void)
 }
 
   bool
-cdrom_interface::insert_cdrom(char *dev)
+cdrom_interface::insert_cdrom()
 {
   uint8 cdb[6];
   uint8 buf[2*BX_CD_FRAMESIZE];

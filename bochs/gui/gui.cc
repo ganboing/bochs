@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: gui.cc,v 1.41 2002-04-18 00:22:19 bdenney Exp $
+// $Id: gui.cc,v 1.39.2.1 2002-05-15 12:40:53 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -192,66 +192,24 @@ bx_gui_c::update_drive_status_buttons (void) {
   void
 bx_gui_c::floppyA_handler(void)
 {
-#if BX_WITH_WX
-  // instead of just toggling the status, call wxWindows to bring up 
-  // a dialog asking what disk image you want to switch to.
-  int ret = SIM->ask_param (BXP_FLOPPYA_PATH);
-  // eject and then insert the disk.  If the new path is invalid,
-  // the status will return 0.
-  unsigned new_status = bx_devices.floppy->set_media_status(0, 0);
-  printf ("eject disk, new_status is %d\n", new_status);
-  new_status = bx_devices.floppy->set_media_status(0, 1);
-  printf ("insert disk, new_status is %d\n", new_status);
-  fflush (stdout);
-  BX_GUI_THIS floppyA_status = new_status;
-#else
   BX_GUI_THIS floppyA_status = !BX_GUI_THIS floppyA_status;
   bx_devices.floppy->set_media_status(0, BX_GUI_THIS floppyA_status);
-#endif
   BX_GUI_THIS update_drive_status_buttons ();
 }
 
   void
 bx_gui_c::floppyB_handler(void)
 {
-#if BX_WITH_WX
-  // instead of just toggling the status, call wxWindows to bring up 
-  // a dialog asking what disk image you want to switch to.
-  int ret = SIM->ask_param (BXP_FLOPPYB_PATH);
-  // eject and then insert the disk.  If the new path is invalid,
-  // the status will return 0.
-  unsigned new_status = bx_devices.floppy->set_media_status(1, 0);
-  printf ("eject disk, new_status is %d\n", new_status);
-  new_status = bx_devices.floppy->set_media_status(1, 1);
-  printf ("insert disk, new_status is %d\n", new_status);
-  fflush (stdout);
-  BX_GUI_THIS floppyB_status = new_status;
-#else
   BX_GUI_THIS floppyB_status = !BX_GUI_THIS floppyB_status;
   bx_devices.floppy->set_media_status(1, BX_GUI_THIS floppyB_status);
-#endif
   BX_GUI_THIS update_drive_status_buttons ();
 }
 
   void
 bx_gui_c::cdromD_handler(void)
 {
-#if BX_WITH_WX
-  // instead of just toggling the status, call wxWindows to bring up 
-  // a dialog asking what disk image you want to switch to.
-  int ret = SIM->ask_param (BXP_CDROM_PATH);
-  // eject and then insert the disk.  If the new path is invalid,
-  // the status will return 0.
-  unsigned status = bx_devices.hard_drive->set_cd_media_status(0);
-  printf ("eject disk, new_status is %d\n", status);
-  status = bx_devices.hard_drive->set_cd_media_status(1);
-  printf ("insert disk, new_status is %d\n", status);
-  fflush (stdout);
-  BX_GUI_THIS cdromD_status = status;
-#else
   BX_GUI_THIS cdromD_status =
     bx_devices.hard_drive->set_cd_media_status(!BX_GUI_THIS cdromD_status);
-#endif
   BX_GUI_THIS update_drive_status_buttons ();
 }
 
@@ -273,7 +231,7 @@ bx_gui_c::power_handler(void)
   BX_PANIC (("POWER button turned off."));
   // shouldn't reach this point, but if you do, QUIT!!!
   fprintf (stderr, "Bochs is exiting because you pressed the power button.\n");
-  BX_EXIT (1);
+  ::exit (1);
 }
 
 Bit32s
@@ -332,24 +290,24 @@ bx_gui_c::snapshot_handler(void)
 {
   char *text_snapshot;
   Bit32u len;
+  char filename[BX_PATHNAME_LEN];
   int flag;
   if (make_text_snapshot (&text_snapshot, &len) < 0) {
     BX_ERROR(( "snapshot button failed, mode not implemented"));
     return;
   }
-  //FIXME
-  char filename[BX_PATHNAME_LEN];
-#if BX_WITH_WX
-  int ret = SIM->ask_filename (filename, sizeof(filename), 
-    "Save snapshot as...", "snapshot.txt", 
-	bx_param_string_c::BX_SAVE_FILE_DIALOG);
-  if (ret < 0) return;  // cancelled
-#else
-  strcpy (filename, "snapshot.txt");
-#endif
-  FILE *fp = fopen(filename, "w");
-  fwrite(text_snapshot, 1, strlen(text_snapshot), fp);
-  fclose(fp);
+  // I wish I had a dialog box!!!
+  flag = 0; // 0 = no dialog present / 1 = OK / -1 = Cancel
+  if (!flag) { // use standard filename if dialog is not present
+    strcpy(filename, "snapshot.txt");
+    flag = 1;
+  }
+  if (flag == 1) {
+    FILE *fp = fopen(filename, "wb");
+    fwrite(text_snapshot, 1, strlen(text_snapshot), fp);
+    fclose(fp);
+    BX_INFO (("copied text snapshot to %s", filename));
+  }
   free(text_snapshot);
 }
 
@@ -376,7 +334,7 @@ bx_gui_c::paste_handler(void)
   void
 bx_gui_c::config_handler(void)
 {
-#if BX_USE_CONTROL_PANEL && !BX_WITH_WX
+#if BX_USE_CONTROL_PANEL
   bx_control_panel (BX_CPANEL_RUNTIME);
 #else
   BX_ERROR(( "# CONFIG callback (unimplemented)." ));

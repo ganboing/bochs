@@ -40,15 +40,6 @@
 // USER CONFIGURABLE OPTIONS : EDIT ONLY OPTIONS IN THIS SECTION //
 ///////////////////////////////////////////////////////////////////
 
-
-#if 1
-// quit_sim is defined in gui/siminterface.h
-#define BX_EXIT(x)  SIM->quit_sim (x)
-#else
-// provide the real main and the usual exit.
-#define BX_EXIT(x)  ::exit(x)
-#endif
-
 #define BX_USE_CONTROL_PANEL 1
 
 // I have tested the following combinations:
@@ -85,9 +76,6 @@
 
 // if NE2K is enabled, this enables the ethertap device.
 #define HAVE_ETHERTAP 0
-
-// this enables TUN/TAP interface
-#define HAVE_TUNTAP 0
 
 // I rebuilt the code which provides timers to IO devices.
 // Setting this to 1 will introduce a little code which
@@ -232,7 +220,6 @@
 //       multiple instances of a device class
 
 #define BX_USE_HD_SMF   1  // Hard drive
-#define BX_USE_BIOS_SMF 1  // BIOS
 #define BX_USE_CMOS_SMF 1  // CMOS
 #define BX_USE_DMA_SMF  1  // DMA
 #define BX_USE_FD_SMF   1  // Floppy
@@ -352,7 +339,6 @@
 #define BX_WITH_RFB 0
 #define BX_WITH_AMIGAOS 0
 #define BX_WITH_SDL 0
-#define BX_WITH_WX 0
 
 
 // Roland Mainz's idle hack is presently specific to X11. If people try to
@@ -545,17 +531,6 @@ typedef unsigned int Boolean;
 #define BX_DYNAMIC_TRANSLATION 0
 #define BX_DYNAMIC_CPU_I386    0
 #define BX_DYNAMIC_CPU_SPARC   0
-
-// caching of fetchdecode() calls
-#define BX_FETCHDECODE_CACHE 0
-
-#if BX_FETCHDECODE_CACHE
-  // The number of entries. MUST be a power of 2
-  #define BX_FDCACHE_SIZE 0x0800
-  #define BX_FDCACHE_MASK (BX_FDCACHE_SIZE-1)
-  #define BX_FDCACHE_RPN_SIZE (0x0080)
-  #define BX_FDCACHE_RPN_MASK (BX_FDCACHE_RPN_SIZE-1)
-#endif // BX_FETCHDECODE_CACHE
 
 #define BX_SUPPORT_FPU 0
 

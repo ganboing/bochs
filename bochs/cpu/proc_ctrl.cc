@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: proc_ctrl.cc,v 1.22 2002-06-19 15:49:07 bdenney Exp $
+// $Id: proc_ctrl.cc,v 1.18.2.1 2002-06-20 17:23:20 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -505,14 +505,16 @@ BX_CPU_C::MOV_CdRd(BxInstruction_t *i)
       //  Protected mode: #GP(0) if attempt to write a 1 to
       //  any reserved bit of CR4
 
-      if (val_32 & ~ 0x10) { // support CR4<PSE> (to allow 4M pages)
+      BX_INFO(("MOV_CdRd: ignoring write to CR4 of 0x%08x",
+        val_32));
+      if (val_32) {
         BX_INFO(("MOV_CdRd: (CR4) write of 0x%08x not supported!",
           val_32));
         }
       // Only allow writes of 0 to CR4 for now.
       // Writes to bits in CR4 should not be 1s as CPUID
       // returns not-supported for all of these features.
-      BX_CPU_THIS_PTR cr4 = val_32 & 0x10;
+      BX_CPU_THIS_PTR cr4 = 0;
 #endif
       break;
     default:
@@ -545,7 +547,7 @@ BX_CPU_C::MOV_RdCd(BxInstruction_t *i)
     }
 
   if (protected_mode() && CPL!=0) {
-//    BX_PANIC(("MOV_RdCd: CPL!=0"));
+    BX_PANIC(("MOV_RdCd: CPL!=0"));
     /* #GP(0) if CPL is not 0 */
     exception(BX_GP_EXCEPTION, 0, 0);
     return;
@@ -1039,7 +1041,6 @@ BX_CPU_C::CPUID(BxInstruction_t *i)
 #else
       BX_PANIC(("CPUID: not implemented for > 6"));
 #endif
-      features |= 8; // support page-size extension (4m pages)
 
       EAX = (family <<8) | (model<<4) | stepping;
       EBX = ECX = 0; // reserved

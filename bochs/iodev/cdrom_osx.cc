@@ -312,7 +312,7 @@ cdrom_interface::~cdrom_interface(void)
 }
 
 bool
-cdrom_interface::insert_cdrom(char *dev)
+cdrom_interface::insert_cdrom()
 {
 
   mach_port_t masterPort = NULL;

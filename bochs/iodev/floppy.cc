@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: floppy.cc,v 1.40 2002-06-23 18:04:07 vruppert Exp $
+// $Id: floppy.cc,v 1.36 2002-03-17 20:55:27 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -87,10 +87,9 @@ bx_floppy_ctrl_c::~bx_floppy_ctrl_c(void)
   void
 bx_floppy_ctrl_c::init(bx_devices_c *d, bx_cmos_c *cmos)
 {
-	BX_DEBUG(("Init $Id: floppy.cc,v 1.40 2002-06-23 18:04:07 vruppert Exp $"));
+	BX_DEBUG(("Init $Id: floppy.cc,v 1.36 2002-03-17 20:55:27 vruppert Exp $"));
   BX_FD_THIS devices = d;
 
-  BX_REGISTER_DMA8_CHANNEL(2, bx_floppy.dma_read, bx_floppy.dma_write, "Floppy Drive");
   BX_FD_THIS devices->register_irq(6, "Floppy Drive");
   for (unsigned addr=0x03F2; addr<=0x03F7; addr++) {
     BX_FD_THIS devices->register_io_read_handler(this, read_handler,
@@ -260,7 +259,7 @@ bx_floppy_ctrl_c::reset(unsigned source)
   BX_FD_THIS s.floppy_buffer_index = 0;
 
   BX_FD_THIS devices->pic->lower_irq(6);
-  BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 0);
+  bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 0);
 }
 
 
@@ -326,20 +325,6 @@ bx_floppy_ctrl_c::read(Bit32u address, unsigned io_len)
       break;
 #endif  // #if BX_DMA_FLOPPY_IO
 
-    case 0x3F3: // Tape Drive Register
-      // see http://www.smsc.com/main/datasheets/37c93x.pdf page 18 for more details
-
-      switch( BX_FD_THIS s.DOR & 0x03 )
-      {
-	case 0x00:
-	  if( (BX_FD_THIS s.DOR & 0x10) == 0) break;
-	  return(2);
-	case 0x01:
-	  if( (BX_FD_THIS s.DOR & 0x20) == 0) break;
-	  return(1);
-      }
-      return(3);
-      
     case 0x3F6: // Reserved for future floppy controllers
                 // This address shared with the hard drive controller
       value = BX_FD_THIS devices->hard_drive->read_handler(BX_FD_THIS devices->hard_drive, address, io_len);
@@ -431,9 +416,7 @@ bx_floppy_ctrl_c::write(Bit32u address, Bit32u value, unsigned io_len)
         BX_DEBUG(("  drive_select=%02x",
           (unsigned) drive_select));
       if (drive_select>1) {
-	BX_DEBUG(("WARNING: applying mod(2) on drive_select"));
-	drive_select &= 0x01;
-	BX_DEBUG(("new drive_select=%d", (unsigned) drive_select));
+        BX_PANIC(("io_write: drive_select>1"));
         }
       break;
 
@@ -788,7 +771,7 @@ bx_floppy_ctrl_c::floppy_command(void)
       /* 4 header bytes per sector are required */
       BX_FD_THIS s.format_count <<= 2;
 
-      BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 1);
+      bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 1);
 
       /* data reg not ready, controller busy */
       BX_FD_THIS s.main_status_reg = FD_MS_BUSY;
@@ -833,7 +816,7 @@ bx_floppy_ctrl_c::floppy_command(void)
       // reported in the head number field.  Real floppy drives are
       // picky about this, as reported in SF bug #439945, (Floppy drive
       // read input error checking).
-      if (head != ((BX_FD_THIS s.command[1]>>2)&1)) {
+      if (head != (BX_FD_THIS s.command[1]>>2)&1) {
         BX_ERROR(("head number in command[1] doesn't match head field"));
         BX_FD_THIS s.result_size = 7;
         BX_FD_THIS s.result_index = 0;
@@ -944,7 +927,7 @@ bx_floppy_ctrl_c::floppy_command(void)
                     512, FROM_FLOPPY);
         BX_FD_THIS s.floppy_buffer_index = 0;
 
-        BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 1);
+        bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 1);
 
         /* data reg not ready, controller busy */
         BX_FD_THIS s.main_status_reg = FD_MS_BUSY;
@@ -954,7 +937,7 @@ bx_floppy_ctrl_c::floppy_command(void)
       else if ((BX_FD_THIS s.command[0] & 0x7f) == 0x45) { // write
         BX_FD_THIS s.floppy_buffer_index = 0;
 
-        BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 1);
+        bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 1);
 
         /* data reg not ready, controller busy */
         BX_FD_THIS s.main_status_reg = FD_MS_BUSY;
@@ -1133,7 +1116,7 @@ bx_floppy_ctrl_c::dma_write(Bit8u *data_byte)
     drive = BX_FD_THIS s.DOR & 0x03;
     increment_sector(); // increment to next sector before retrieving next one
     BX_FD_THIS s.floppy_buffer_index = 0;
-    if (BX_DMA_GET_TC()) { // Terminal Count line, done
+    if (bx_pc_system.TC) { // Terminal Count line, done
       BX_FD_THIS s.pending_command = 0;
       BX_FD_THIS s.main_status_reg = FD_MS_MRQ | FD_MS_DIO | FD_MS_BUSY | (1 << drive);
       BX_FD_THIS s.result_size = 7;
@@ -1157,7 +1140,7 @@ bx_floppy_ctrl_c::dma_write(Bit8u *data_byte)
         }
 
       raise_interrupt();
-      BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 0);
+      bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 0);
       }
     else { // more data to transfer
       Bit32u logical_sector;
@@ -1211,7 +1194,7 @@ bx_floppy_ctrl_c::dma_read(Bit8u *data_byte)
                     512, TO_FLOPPY);
         break;
       }
-    if ((BX_FD_THIS s.format_count == 0) || (BX_DMA_GET_TC())) {
+    if ((BX_FD_THIS s.format_count == 0) || (bx_pc_system.TC)) {
       BX_FD_THIS s.format_count = 0;
       BX_FD_THIS s.pending_command = 0;
       BX_FD_THIS s.main_status_reg = FD_MS_MRQ | FD_MS_DIO | FD_MS_BUSY | (1 << drive);
@@ -1223,7 +1206,7 @@ bx_floppy_ctrl_c::dma_read(Bit8u *data_byte)
       BX_FD_THIS s.result[2] = BX_FD_THIS s.status_reg2;
       // 4 result bytes are unused
       raise_interrupt();
-      BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 0);
+      bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 0);
       }
     return;
     }
@@ -1259,7 +1242,7 @@ bx_floppy_ctrl_c::dma_read(Bit8u *data_byte)
                 512, TO_FLOPPY);
     increment_sector(); // increment to next sector after writing current one
     BX_FD_THIS s.floppy_buffer_index = 0;
-    if (BX_DMA_GET_TC()) { // Terminal Count line, done
+    if (bx_pc_system.TC) { // Terminal Count line, done
       BX_FD_THIS s.pending_command = 0;
       BX_FD_THIS s.main_status_reg = FD_MS_MRQ | FD_MS_DIO | FD_MS_BUSY;
       BX_FD_THIS s.result_size = 7;
@@ -1282,7 +1265,7 @@ bx_floppy_ctrl_c::dma_read(Bit8u *data_byte)
         }
 
       raise_interrupt();
-      BX_DMA_SET_DRQ(FLOPPY_DMA_CHAN, 0);
+      bx_pc_system.set_DRQ(FLOPPY_DMA_CHAN, 0);
       }
     else { // more data to transfer
       } // else

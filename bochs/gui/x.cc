@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: x.cc,v 1.43 2002-05-18 16:02:20 vruppert Exp $
+// $Id: x.cc,v 1.38 2002-03-19 23:38:08 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -59,7 +59,6 @@ static Window win;
 static GC gc, gc_inv, gc_headerbar, gc_headerbar_inv;
 static XFontStruct *font_info;
 static unsigned font_width, font_height;
-static unsigned font_height_orig = 16;
 static Bit8u blank_line[80];
 static unsigned dimension_x=0, dimension_y=0;
 
@@ -597,9 +596,7 @@ load_font(void)
   /* Load font and get font information structure. */
   if ((font_info = XLoadQueryFont(bx_x_display,"bochsvga")) == NULL) {
     if ((font_info = XLoadQueryFont(bx_x_display,"vga")) == NULL) {
-      if ((font_info = XLoadQueryFont(bx_x_display,"-*-vga-*")) == NULL) {
-	BX_PANIC(("Could not open vga font. See docs-html/install.html"));
-      }
+      BX_PANIC(("Could not open vga font. See docs-html/install.html"));
     }
   }
 }
@@ -885,9 +882,6 @@ xkeypress(KeySym keysym, int press_release)
         key_event = BX_KEY_KP_LEFT; break;
 
       case XK_KP_5:
-#ifdef XK_KP_Begin
-      case XK_KP_Begin:
-#endif
         key_event = BX_KEY_KP_5; break;
 
       case XK_KP_6:
@@ -1011,30 +1005,31 @@ bx_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
                       unsigned long cursor_x, unsigned long cursor_y,
                       Bit16u cursor_state, unsigned nrows)
 {
+  int font_height;
   unsigned i, x, y, curs;
   unsigned new_foreground, new_background;
   Bit8u string[1];
   Bit8u cs_start, cs_end;
   unsigned nchars;
 
-  UNUSED(nrows);
+  cs_start = (cursor_state >> 8) & 0x3f;
+  cs_end = cursor_state & 0x1f;
 
-  cs_start = ((cursor_state >> 8) & 0x3f) * font_height / font_height_orig;
-  cs_end = (cursor_state & 0x1f) * font_height / font_height_orig;
+  font_height = font_info->ascent + font_info->descent;
 
   // Number of characters on screen, variable number of rows
-  nchars = columns*rows;
+  nchars = 80*nrows;
 
   // first draw over character at original block cursor location
-  if ( (prev_block_cursor_y*columns + prev_block_cursor_x) < nchars ) {
-    curs = (prev_block_cursor_y*columns + prev_block_cursor_x)*2;
+  if ( (prev_block_cursor_y*80 + prev_block_cursor_x) < nchars ) {
+    curs = (prev_block_cursor_y*80 + prev_block_cursor_x)*2;
     string[0] = new_text[curs];
     if (string[0] == 0) string[0] = ' '; // convert null to space
     XSetForeground(bx_x_display, gc, col_vals[new_text[curs+1] & 0x0f]);
     XSetBackground(bx_x_display, gc, col_vals[(new_text[curs+1] & 0xf0) >> 4]);
     XDrawImageString(bx_x_display, win,
       gc,
-      prev_block_cursor_x * font_width,
+      prev_block_cursor_x * font_info->max_bounds.width,
       prev_block_cursor_y * font_height + font_info->max_bounds.ascent + bx_headerbar_y,
       (char *) string,
       1);
@@ -1055,12 +1050,12 @@ bx_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
 //XSetForeground(bx_x_display, gc, white_pixel);
 //XSetBackground(bx_x_display, gc, black_pixel);
 
-      x = (i/2) % columns;
-      y = (i/2) / columns;
+      x = (i/2) % 80;
+      y = (i/2) / 80;
 
       XDrawImageString(bx_x_display, win,
         gc,
-        x * font_width,
+        x * font_info->max_bounds.width,
         y * font_height + font_info->max_bounds.ascent + bx_headerbar_y,
         (char *) string,
         1);
@@ -1074,13 +1069,13 @@ bx_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
   XSetBackground(bx_x_display, gc, black_pixel);
 
   // now draw character at new block cursor location in reverse
-  if ( ( (cursor_y*columns + cursor_x) < nchars ) && (cs_start <= cs_end) ) {
+  if ( ( (cursor_y*80 + cursor_x) < nchars ) && (cs_start <= cs_end) ) {
     for (unsigned i = cs_start; i <= cs_end; i++)
       XDrawLine(bx_x_display, win,
 	gc_inv,
-	cursor_x * font_width,
+	cursor_x * font_info->max_bounds.width,
 	cursor_y * font_height + bx_headerbar_y + i,
-	(cursor_x + 1) * font_width - 1,
+	(cursor_x + 1) * font_info->max_bounds.width - 1,
 	cursor_y * font_height + bx_headerbar_y + i
       );
     }
@@ -1211,19 +1206,8 @@ bx_gui_c::palette_change(unsigned index, unsigned red, unsigned green, unsigned 
 
 
   void
-bx_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight)
+bx_gui_c::dimension_update(unsigned x, unsigned y)
 {
-  if (fheight > 0) {
-    font_height_orig = fheight;
-    rows = y / fheight;
-    columns = x / 8;
-    if (fheight != font_height) {
-      y = rows * font_height;
-    }
-    if (font_width != 8) {
-      x = columns * font_width;
-    }
-  }
   if ( (x != dimension_x) || (y != (dimension_y-bx_headerbar_y)) ) {
     XSizeHints hints;
     long supplied_return;
@@ -1348,7 +1332,6 @@ headerbar_click(int x, int y)
   void
 bx_gui_c::exit(void)
 {
-  XCloseDisplay (bx_x_display);
   BX_INFO(("Exit."));
 }
 
