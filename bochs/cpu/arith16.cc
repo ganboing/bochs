@@ -555,7 +555,7 @@ BX_CPU_C::XADD_EwGw(BxInstruction_t *i)
 
     SET_FLAGS_OSZAPC_16(op1_16, op2_16, sum_16, BX_INSTR_XADD16);
 #else
-  BX_PANIC(("XADD_EvGv: not supported on < 80486"));
+  BX_PANIC(("XADD_EvGv: not supported on < 80486\n"));
 #endif
 }
 
@@ -806,6 +806,6 @@ BX_CPU_C::CMPXCHG_EwGw(BxInstruction_t *i)
       }
 
 #else
-  BX_PANIC(("CMPXCHG_EwGw:"));
+  BX_PANIC(("CMPXCHG_EwGw:\n"));
 #endif
 }
