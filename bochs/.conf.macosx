@@ -19,7 +19,6 @@ export CXXFLAGS
 export LDFLAGS
 
 ./configure --enable-cdrom \
-	    --enable-sb16=osx \
 	    --enable-ne2000 \
 	    --enable-vbe \
 	    --enable-all-optimizations \

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: pit.cc,v 1.17 2004-02-01 23:42:04 cbothamy Exp $
+// $Id: pit.cc,v 1.15 2003-07-31 12:04:48 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -417,10 +417,6 @@ BX_INFO(("timer 0-2 mode control: comm:%02x mode:%02x bcd_mode:%u",
 
     case 0x61:
       BX_PIT_THIS s.speaker_data_on = (value >> 1) & 0x01;
-      if ( BX_PIT_THIS s.speaker_data_on )
-        DEV_speaker_beep_on(440.0);
-      else
-        DEV_speaker_beep_off();
 /*??? only on AT+ */
       set_GATE(2, value & 0x01);
 #if BX_CPU_LEVEL < 2

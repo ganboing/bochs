@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: serial_raw.cc,v 1.6 2004-01-18 11:58:07 vruppert Exp $
+// $Id: serial_raw.cc,v 1.4 2001-10-03 13:10:38 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (C) 2004  MandrakeSoft S.A.
+//  Copyright (C) 2001  MandrakeSoft S.A.
 //
 //    MandrakeSoft S.A.
 //    43, rue d'Aboukir
@@ -25,26 +25,13 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 //
 
-// Define BX_PLUGGABLE in files that can be compiled into plugins.  For
-// platforms that require a special tag on exported symbols, BX_PLUGGABLE 
-// is used to know when we are exporting symbols and when we are importing.
-#define BX_PLUGGABLE
-
 #include "bochs.h"
+#define LOG_THIS bx_serial.
 
-#if USE_RAW_SERIAL
-
-#define LOG_THIS bx_devices.pluginSerialDevice->
-
-serial_raw::serial_raw (char *devname)
+serial_raw::serial_raw (char *ttypath, int signal)
 {
   put ("SERR");
   settype (SERRLOG);
-}
-
-serial_raw::~serial_raw (void)
-{
-  // nothing here yet
 }
 
 void 
@@ -104,4 +91,3 @@ serial_raw::receive ()
   return (int)'A';
 }
 
-#endif

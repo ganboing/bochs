@@ -1,13 +1,8 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: serial_raw.h,v 1.4 2004-01-18 11:58:07 vruppert Exp $
+// $Id: serial_raw.h,v 1.2 2001-10-03 13:10:38 bdenney Exp $
 /////////////////////////////////////////////////////////////////////////
 //
-
-#if USE_RAW_SERIAL
-
-#ifdef __linux__
 #include <linux/serial.h>
-#endif
 
 #define P_EVEN 0
 #define P_ODD 1
@@ -15,8 +10,7 @@
 
 class serial_raw : public logfunctions {
   public:
-    serial_raw (char *devname);
-    ~serial_raw (void);
+    serial_raw (char *ttypath, int signal);
     void set_baudrate (int rate);
     void set_data_bits (int );
     void set_stop_bits (int);
@@ -27,4 +21,3 @@ class serial_raw : public logfunctions {
     int ready_receive ();
     int receive ();
 };
-#endif

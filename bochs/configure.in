@@ -2,15 +2,15 @@ dnl // Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.50)
 AC_INIT(bochs.h)
-AC_REVISION([[$Id: configure.in,v 1.248 2004-02-09 22:23:52 danielg4 Exp $]])
+AC_REVISION([[$Id: configure.in,v 1.237.2.2 2004-02-06 12:29:41 cbothamy Exp $]])
 AC_CONFIG_HEADER(config.h)
 AC_CONFIG_HEADER(ltdlconf.h)
 
 dnl // Put Bochs version information right here so that it gets substituted
 dnl // into all the right places.
-VERSION="2.1.cvs"
-VER_STRING="2.1.cvs"
-REL_STRING="Build from CVS, after 2.1"
+VERSION="2.1.1"
+VER_STRING="2.1.1"
+REL_STRING="February 08, 2004"
 
 changequote(<<, >>)
 changequote([, ])
@@ -136,7 +136,6 @@ AC_CHECK_FUNCS(getenv, AC_DEFINE(BX_HAVE_GETENV))
 AC_CHECK_FUNCS(setenv, AC_DEFINE(BX_HAVE_SETENV))
 AC_CHECK_FUNCS(select, AC_DEFINE(BX_HAVE_SELECT))
 AC_CHECK_FUNCS(snprintf, AC_DEFINE(BX_HAVE_SNPRINTF))
-AC_CHECK_FUNCS(vsnprintf, AC_DEFINE(BX_HAVE_VSNPRINTF))
 AC_CHECK_FUNCS(strtoull, AC_DEFINE(BX_HAVE_STRTOULL))
 AC_CHECK_FUNCS(strtouq, AC_DEFINE(BX_HAVE_STRTOUQ))
 AC_CHECK_FUNCS(strdup, AC_DEFINE(BX_HAVE_STRDUP))
@@ -717,16 +716,12 @@ AC_ARG_ENABLE(ne2000,
     AC_MSG_RESULT(yes)
     AC_DEFINE(BX_NE2K_SUPPORT, 1)
     NE2K_OBJS='ne2k.o'
-    NETLOW_OBJS='eth.o eth_null.o eth_vnet.o'
+    NETLOW_OBJS='eth.o eth_null.o'
     AC_CHECK_HEADER(net/bpf.h, NETLOW_OBJS="$NETLOW_OBJS eth_fbsd.o")
     AC_CHECK_HEADER(netpacket/packet.h, NETLOW_OBJS="$NETLOW_OBJS eth_linux.o")
     case "$target" in
       *-pc-windows* | *-pc-winnt* | *-pc-cygwin* | *-pc-mingw32*)
       NETLOW_OBJS="$NETLOW_OBJS eth_win32.o"
-      ;;
-      *-macosx* | *-darwin*)
-      NETLOW_OBJS="$NETLOW_OBJS eth_tuntap.o"
-      AC_DEFINE(HAVE_TUNTAP, 1)
       ;;
       *)
       AC_CHECK_HEADER(net/if.h, [
@@ -749,26 +744,14 @@ AC_ARG_ENABLE(ne2000,
         AC_DEFINE(HAVE_ETHERTAP, 1)
       fi
 
-      AC_CHECK_HEADER(net/if_tun.h, [
-	  use_tuntap=yes
-	  ], [],
-	  [
-	  #include <sys/types.h>
-	  #include <sys/socket.h>
-	  #include <net/if.h>
-	])
       AC_CHECK_HEADER(linux/if_tun.h, [
-	  use_tuntap=yes
-	  ], [],
-	  [
-	  #include <asm/types.h>
+          NETLOW_OBJS="$NETLOW_OBJS eth_tuntap.o"
+          AC_DEFINE(HAVE_TUNTAP, 1)
+        ], [], 
+        [
+    	  #include <asm/types.h>
 	  #include <sys/socket.h>
-	])
-      if test "$use_tuntap" = yes; then
-	NETLOW_OBJS="$NETLOW_OBJS eth_tuntap.o"
-	AC_DEFINE(HAVE_TUNTAP, 1)
-      fi
-
+        ])
       ;;
     esac
     networking=yes
@@ -797,81 +780,19 @@ AC_ARG_ENABLE(pci,
   [if test "$enableval" = yes; then
     AC_MSG_RESULT(yes)
     AC_DEFINE(BX_PCI_SUPPORT, 1)
-    pci=1
     PCI_OBJ='pci.o pci2isa.o pcivga.o'
    else
     AC_MSG_RESULT(no)
     AC_DEFINE(BX_PCI_SUPPORT, 0)
-    pci=0
     PCI_OBJ=''
    fi],
   [
     AC_MSG_RESULT(no)
     AC_DEFINE(BX_PCI_SUPPORT, 0)
-    pci=0
     PCI_OBJ=''
     ]
   )
 AC_SUBST(PCI_OBJ)
-
-#
-# PCI host device support
-#
-AC_MSG_CHECKING(for PCI host device mapping support)
-AC_ARG_ENABLE(pcidev,
-  [  --enable-pcidev                   enable PCI host device mapping support],
-  [
-    if test "$enableval" = "yes"; then
-      AC_MSG_RESULT(yes)
-      if test "$pci" != "1"; then
-        AC_MSG_ERROR([PCI host device mapping requires PCI support])
-      fi
-      case "$target" in
-        *-pc-linux*)
-          AC_MSG_NOTICE([Linux detected as host for PCI host device mapping])
-          linux_version=`uname -r`
-	  case "$linux_version" in
-		2.4*)
-	  		PCIDEV_MODULE_MAKE_ALL="all-kernel24"
-			KERNEL_MODULE_SUFFIX="o"
-          	;;
-		2.6*)
-	  		PCIDEV_MODULE_MAKE_ALL="all-kernel26"
-			KERNEL_MODULE_SUFFIX="ko"
-		;;
-		*)
-			AC_MSG_ERROR([Linux kernel 2.4 or 2.6 is required])
-		;;
-	  esac
-	  KERNELDIR="/lib/modules/$linux_version/build"
-	  LSMOD="lsmod"
-	  INSMOD="insmod"
-	  RMMOD="rmmod"
-	  DEPMOD="depmod"
-	  AC_SUBST(KERNELDIR)
-	  AC_SUBST(LSMOD)
-	  AC_SUBST(INSMOD)
-	  AC_SUBST(RMMOD)
-	  AC_SUBST(DEPMOD)
-	  AC_SUBST(PCIDEV_MODULE_MAKE_ALL)
-	  AC_SUBST(KERNEL_MODULE_SUFFIX)
-        ;;
-        *)
-          AC_MSG_ERROR([PCI host device mapping requires Linux as host])
-        ;;
-      esac
-      AC_DEFINE(BX_PCI_DEV_SUPPORT, 1)
-      PCI_OBJ="$PCI_OBJ pcidev.o"
-    else
-      AC_MSG_RESULT(no)
-      AC_DEFINE(BX_PCI_DEV_SUPPORT, 0)
-    fi
-  ],
-  [
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_PCI_DEV_SUPPORT, 0)
-  ]
-)
 
 AC_MSG_CHECKING(for limited USB support)
 AC_ARG_ENABLE(usb,
@@ -887,23 +808,6 @@ AC_ARG_ENABLE(usb,
   [
     AC_MSG_RESULT(no)
     AC_DEFINE(BX_PCI_USB_SUPPORT, 0)
-    ]
-  )
-
-AC_MSG_CHECKING(for pseudo NIC support)
-AC_ARG_ENABLE(pnic,
-  [  --enable-pnic                     enable pseudo NIC support],
-  [if test "$enableval" = yes; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(BX_PCI_PNIC_SUPPORT, 1)
-    PCI_OBJ="$PCI_OBJ pcipnic.o"
-   else
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_PCI_PNIC_SUPPORT, 0)
-   fi],
-  [
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_PCI_PNIC_SUPPORT, 0)
     ]
   )
 
@@ -1204,28 +1108,6 @@ AC_ARG_ENABLE(external-debugger,
   ])
 AC_SUBST(BX_EXTERNAL_DEBUGGER)
 
-AC_MSG_CHECKING(for magic breakpoints)
-EXT_DEBUG_OBJS=''
-AC_ARG_ENABLE(magic-breakpoints,
-  [  --enable-magic-breakpoints        enable magic debugger breakpoints],
-  [if test "$enableval" = yes; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(BX_MAGIC_BREAKPOINT, 1)
-   else
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_MAGIC_BREAKPOINT, 0)
-   fi],
-  [
-    if test "$bx_debugger" = 1; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(BX_MAGIC_BREAKPOINT, 1)
-    else
-      AC_MSG_RESULT(no)
-      AC_DEFINE(BX_MAGIC_BREAKPOINT, 0)
-    fi
-  ])
-AC_SUBST(BX_MAGIC_BREAKPOINT)
-
 AC_MSG_CHECKING(for disassembler support)
 AC_ARG_ENABLE(disasm,
   [  --enable-disasm                   compile in support for disassembler],
@@ -1465,22 +1347,6 @@ AC_ARG_ENABLE(time0,
   )
 
 
-AC_MSG_CHECKING(for raw serial support)
-AC_ARG_ENABLE(raw-serial,
-  [  --enable-raw-serial               use raw serial port access],
-  [if test "$enableval" = yes; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_RAW_SERIAL, 1)
-   else
-    AC_MSG_RESULT(no)
-    AC_DEFINE(USE_RAW_SERIAL, 0)
-   fi],
-  [
-    AC_MSG_RESULT(no)
-    AC_DEFINE(USE_RAW_SERIAL, 0)
-    ]
-  )
-
 AC_MSG_CHECKING(for VESA BIOS extensions)
 AC_ARG_ENABLE(vbe,
   [  --enable-vbe                      use VESA BIOS extensions],
@@ -1716,7 +1582,7 @@ SOUNDLOW_OBJS=''
 GAME_OBJS=''
 gameport_present=0
 AC_ARG_ENABLE(sb16,
-  [  --enable-sb16=xxx                 Sound Blaster 16 Support (xxx=dummy|win|linux|freebsd|osx)],
+  [  --enable-sb16=xxx                 Sound Blaster 16 Support (xxx=dummy|win|linux|freebsd)],
   [if test "$enableval" = no; then
      AC_MSG_RESULT(no)
      AC_DEFINE(BX_SUPPORT_SB16, 0)
@@ -1739,16 +1605,10 @@ AC_ARG_ENABLE(sb16,
          AC_MSG_RESULT(win)
 		 DEVICE_LINK_OPTS="$DEVICE_LINK_OPTS -lwinmm"
          ;;
-       osx)
-         SOUNDLOW_OBJS='soundosx.o'
-         AC_DEFINE(BX_SOUND_OUTPUT_C, bx_sound_osx_c)
-         AC_MSG_RESULT(osx)
-		 DEVICE_LINK_OPTS="$DEVICE_LINK_OPTS -framework AudioUnit -framework AudioToolbox"
-         ;;
        *)
          echo " "
          echo \!\!\!Error\!\!\!
-         echo "You must pass one of dummy, linux, win, freebsd, osx to --enable-sb16"
+         echo "You must pass one of dummy, linux, win, freebsd to --enable-sb16"
          exit 1 ;;
      esac
      SB16_OBJS='sb16.o'
@@ -1973,7 +1833,6 @@ EXE=""
 COMMAND_SEPARATOR="&& \\"
 CD_UP_ONE="echo done"
 CD_UP_TWO="echo done"
-CD_UP_THREE="echo done"
 
 INSTALL_TARGET=install_unix
 INSTALL_LIST_FOR_PLATFORM=
@@ -2239,9 +2098,6 @@ if test "$display_libs" = " wxWindows"; then
   AC_MSG_RESULT(wxWindows)
   AC_DEFINE(BX_DEFAULT_CONFIG_INTERFACE, "wx")
   AC_DEFINE(BX_DEFAULT_DISPLAY_LIBRARY, "wx")
-  AC_DEFINE(BX_USE_TEXTCONFIG, 0)
-else
-  AC_DEFINE(BX_USE_TEXTCONFIG, 1)
 fi
 
 if test "$bx_plugins" = 1; then
@@ -2306,7 +2162,6 @@ case "$target" in
     COMMAND_SEPARATOR=""
     CD_UP_ONE="cd .."
     CD_UP_TWO="cd ..\.."
-    CD_UP_THREE="cd ..\..\.."
     have_gettimeofday=0  # even though it may exist in build environment
     AC_DEFINE(BX_64BIT_CONSTANTS_USE_LL, 0)
     AC_DEFINE(inline, __inline)
@@ -2640,7 +2495,6 @@ AC_SUBST(PLUGIN_LIBNAME_TRANSFORMATION)
 AC_SUBST(COMMAND_SEPARATOR)
 AC_SUBST(CD_UP_ONE)
 AC_SUBST(CD_UP_TWO)
-AC_SUBST(CD_UP_THREE)
 AC_SUBST(VERSION)
 AC_SUBST(VER_STRING)
 AC_SUBST(REL_STRING)
@@ -2662,5 +2516,4 @@ AC_OUTPUT(Makefile iodev/Makefile bx_debug/Makefile bios/Makefile \
 	 fpu/Makefile doc/docbook/Makefile \
 	 build/linux/bochs-dlx \
 	 bxversion.h build/macosx/Info.plist \
-	 build/win32/nsis/Makefile build/win32/nsis/bochs.nsi \
-	 host/linux/pcidev/Makefile)
+	 build/win32/nsis/Makefile build/win32/nsis/bochs.nsi)

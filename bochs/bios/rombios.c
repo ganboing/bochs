@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: rombios.c,v 1.108 2004-02-09 16:48:50 vruppert Exp $
+// $Id: rombios.c,v 1.103.2.2 2004-02-02 22:39:22 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -104,8 +104,12 @@
 //     - f02/03/04 should set current cyl,etc in BDA  (?)
 //     - rewrite int13_relocated & clean up int13 entry code
 //
+//   int1a:
+//     - f03/f05 are not complete - just CLC for now (?)
+//
 //   NOTES:
 //   - NMI access (bit7 of addr written to 70h)
+//   - timer ISR should deal with floppy counter and turn floppy motor off
 //
 //   ATA driver
 //   - should handle the "don't detect" bit (cmos regs 0x3b & 0x3c)
@@ -143,7 +147,6 @@
 #define BX_CALL_INT15_4F 1
 #define BX_USE_EBDA      1
 #define BX_SUPPORT_FLOPPY 1
-#define BX_FLOPPY_ON_CNT 37   // 2 seconds
 #define BX_PCIBIOS       1
 
 #define BX_USE_ATADRV    1
@@ -925,10 +928,10 @@ Bit16u cdrom_boot();
 
 #endif // BX_ELTORITO_BOOT
 
-static char bios_cvs_version_string[] = "$Revision: 1.108 $";
-static char bios_date_string[] = "$Date: 2004-02-09 16:48:50 $";
+static char bios_cvs_version_string[] = "$Revision: 1.103.2.2 $";
+static char bios_date_string[] = "$Date: 2004-02-02 22:39:22 $";
 
-static char CVSID[] = "$Id: rombios.c,v 1.108 2004-02-09 16:48:50 vruppert Exp $";
+static char CVSID[] = "$Id: rombios.c,v 1.103.2.2 2004-02-02 22:39:22 cbothamy Exp $";
 
 /* Offset to skip the CVS $Id: prefix */ 
 #define bios_version_string  (CVSID + 4)
@@ -1159,6 +1162,7 @@ ASM_START
 ASM_END
 }
 #endif
+
 
   void
 outb(port, val)
@@ -3238,7 +3242,7 @@ int14_function(regs, ds, iret_addr)
   sti
   ASM_END
 
-  addr = read_word(0x0040, (regs.u.r16.dx << 1));
+  addr = read_word(0x0040, 2 * regs.u.r16.dx);
   timeout = read_byte(0x0040, 0x007C + regs.u.r16.dx);
   if ((regs.u.r16.dx < 4) && (addr > 0)) {
     switch (regs.u.r8.ah) {
@@ -6249,9 +6253,6 @@ floppy_drive_recal(drive)
   dor |= drive;
   outb(0x03f2, dor);
 
-  // reset the disk motor timeout value of INT 08
-  write_byte(0x40,0x40, BX_FLOPPY_ON_CNT);
-
   // check port 3f4 for drive readiness
   val8 = inb(0x3f4);
   if ( (val8 & 0xf0) != 0x80 )
@@ -6314,6 +6315,7 @@ floppy_drive_exists(drive)
   else
     return(1);
 }
+
 
 #if BX_SUPPORT_FLOPPY
   void
@@ -6484,9 +6486,6 @@ BX_INFO("floppy: drive>1 || head>1 ...\n");
         dor |= drive;
         outb(0x03f2, dor);
 
-        // reset the disk motor timeout value of INT 08
-        write_byte(0x40,0x40, BX_FLOPPY_ON_CNT);
-
         // check port 3f4 for drive readiness
         val8 = inb(0x3f4);
         if ( (val8 & 0xf0) != 0x80 )
@@ -6631,9 +6630,6 @@ BX_INFO("floppy: drive>1 || head>1 ...\n");
         dor |= 0x0c;
         dor |= drive;
         outb(0x03f2, dor);
-
-        // reset the disk motor timeout value of INT 08
-        write_byte(0x40,0x40, BX_FLOPPY_ON_CNT);
 
         // check port 3f4 for drive readiness
         val8 = inb(0x3f4);
@@ -6809,10 +6805,6 @@ BX_DEBUG_INT13_FL("floppy f05\n");
       dor |= 0x0c;
       dor |= drive;
       outb(0x03f2, dor);
-
-      // reset the disk motor timeout value of INT 08
-      write_byte(0x40,0x40, BX_FLOPPY_ON_CNT);
-
       // check port 3f4 for drive readiness
       val8 = inb(0x3f4);
       if ( (val8 & 0xf0) != 0x80 )
@@ -7150,9 +7142,9 @@ int17_function(regs, ds, iret_addr)
   sti
   ASM_END
 
-  addr = read_word(0x0040, (regs.u.r16.dx << 1) + 8);
-  if ((regs.u.r8.ah < 3) && (regs.u.r16.dx < 3) && (addr > 0)) {
-    timeout = read_byte(0x0040, 0x0078 + regs.u.r16.dx) << 8;
+  if ((regs.u.r8.ah < 3) && (regs.u.r16.dx == 0)) {
+    addr = read_word(0x0040, 0x0008);
+    timeout = read_byte(0x0040, 0x0078) << 8;
     if (regs.u.r8.ah == 0) {
       outb(addr, regs.u.r8.al);
       val8 = inb(addr+2);
@@ -8608,75 +8600,8 @@ pci_real_select_reg:
   mov dx, #0x0cf8
   out dx,  eax
   ret
-  
-.align 16
-pci_routing_table_structure:
-  db 0x24, 0x50, 0x49, 0x52  ;; "$PIR" signature
-  db 0, 1 ;; version
-  dw 32 + (4 * 16) ;; table size
-  db 0 ;; PCI interrupt router bus
-  db 0x8 ;; PCI interrupt router DevFunc
-  dw 0x0000 ;; PCI exclusive IRQs 
-  dw 0x8086 ;; compatible PCI interrupt router vendor ID
-  dw 0x122e ;; compatible PCI interrupt router device ID
-  dw 0,0 ;; Miniport data
-  db 0,0,0,0,0,0,0,0,0,0,0 ;; reserved
-  db 0x97 ;; checksum
-  ;; first slot entry: 440FX
-  db 0 ;; pci bus number
-  db 0 ;; pci device number (bit 7-3)
-  db 0x60 ;; link value INTA#: pointer into PCI2ISA config space
-  dw 0xdef8 ;; IRQ bitmap INTA# 
-  db 0x61 ;; link value INTB#
-  dw 0xdef8 ;; IRQ bitmap INTB# 
-  db 0x62 ;; link value INTC#
-  dw 0xdef8 ;; IRQ bitmap INTC# 
-  db 0x63 ;; link value INTD#
-  dw 0xdef8 ;; IRQ bitmap INTD#
-  db 0 ;; physical slot (0 = embedded)
-  db 0 ;; reserved
-  ;; second slot entry: PCI-to-ISA
-  db 0 ;; pci bus number
-  db 0x08 ;; pci device number (bit 7-3)
-  db 0x61 ;; link value INTA#
-  dw 0xdef8 ;; IRQ bitmap INTA# 
-  db 0x62 ;; link value INTB#
-  dw 0xdef8 ;; IRQ bitmap INTB# 
-  db 0x63 ;; link value INTC#
-  dw 0xdef8 ;; IRQ bitmap INTC# 
-  db 0x60 ;; link value INTD#
-  dw 0xdef8 ;; IRQ bitmap INTD#
-  db 0 ;; physical slot (0 = embedded)
-  db 0 ;; reserved
-  ;; 3th slot entry: PCI VGA
-  db 0 ;; pci bus number
-  db 0x10 ;; pci device number (bit 7-3)
-  db 0x62 ;; link value INTA#
-  dw 0xdef8 ;; IRQ bitmap INTA# 
-  db 0x63 ;; link value INTB#
-  dw 0xdef8 ;; IRQ bitmap INTB# 
-  db 0x60 ;; link value INTC#
-  dw 0xdef8 ;; IRQ bitmap INTC# 
-  db 0x61 ;; link value INTD#
-  dw 0xdef8 ;; IRQ bitmap INTD#
-  db 1 ;; physical slot (0 = embedded)
-  db 0 ;; reserved
-  ;; 4th slot entry: a PCI device 
-  db 0 ;; pci bus number
-  db 0x18 ;; pci device number (bit 7-3)
-  db 0x63 ;; link value INTA#
-  dw 0xdef8 ;; IRQ bitmap INTA# 
-  db 0x60 ;; link value INTB#
-  dw 0xdef8 ;; IRQ bitmap INTB# 
-  db 0x61 ;; link value INTC#
-  dw 0xdef8 ;; IRQ bitmap INTC# 
-  db 0x62 ;; link value INTD#
-  dw 0xdef8 ;; IRQ bitmap INTD#
-  db 2 ;; physical slot (0 = embedded)
-  db 0 ;; reserved
-#endif // BX_PCIBIOS
+#endif
 
-use16 386
 detect_parport:
   push dx
   add  dx, #2
@@ -8942,10 +8867,6 @@ post_default_ints:
   mov dx, #0x03f8 ; Serial I/O address, port 1
   call detect_serial
   mov dx, #0x02f8 ; Serial I/O address, port 2
-  call detect_serial
-  mov dx, #0x03e8 ; Serial I/O address, port 3
-  call detect_serial
-  mov dx, #0x02e8 ; Serial I/O address, port 4
   call detect_serial
   shl bx, #0x09
   mov ax, 0x410   ; Equipment word bits 9..11 determing # serial ports
@@ -9613,23 +9534,6 @@ int08_handler:
   push ds
   xor ax, ax
   mov ds, ax
-
-  ;; time to turn off drive(s)?
-  mov  al,0x0440
-  or   al,al
-  jz   int08_floppy_off
-  dec  al
-  mov  0x0440,al
-  jnz  int08_floppy_off
-  ;; turn motor(s) off
-  push dx
-  mov  dx,#0x03f2
-  in   al,dx
-  and  al,#0xcf
-  out  dx,al
-  pop  dx
-int08_floppy_off:
-
   mov eax, 0x046c ;; get ticks dword
   inc eax
 

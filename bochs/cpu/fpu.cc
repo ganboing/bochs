@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: fpu.cc,v 1.10 2004-02-11 20:04:34 sshwarts Exp $
+// $Id: fpu.cc,v 1.5.2.1 2004-02-02 22:36:03 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //  Copyright (C) 2001  MandrakeSoft S.A.
 //
@@ -24,6 +24,8 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
 
+#include "bochs.h"
+
 #define NEED_CPU_REG_SHORTCUTS 1
 #include "bochs.h"
 #define LOG_THIS BX_CPU_THIS_PTR
@@ -34,23 +36,6 @@ void BX_CPU_C::prepareFPU(void)
 {
   if (BX_CPU_THIS_PTR cr0.em || BX_CPU_THIS_PTR cr0.ts) {
     exception(BX_NM_EXCEPTION, 0, 0);
-  }
-}
-
-void BX_CPU_C::FPU_check_pending_exceptions(void)
-{
-  if(FPU_PARTIAL_STATUS & FPU_SW_SUMMARY)
-  {
-    if (BX_CPU_THIS_PTR cr0.ne == 0)
-    {
-      // MSDOS compatibility external interrupt (IRQ13)
-      BX_INFO (("math_abort: MSDOS compatibility FPU exception"));
-      DEV_pic_raise_irq(13);
-    }
-    else
-    {
-      exception(BX_MF_EXCEPTION, 0, 0);
-    }
   }
 }
 #endif
@@ -1275,7 +1260,6 @@ void BX_CPU_C::FNOP(bxInstruction_c *i)
 {
 #if BX_SUPPORT_FPU
   BX_CPU_THIS_PTR prepareFPU();
-  BX_CPU_THIS_PTR FPU_check_pending_exceptions();
 
   // Perform no FPU operation. This instruction takes up space in the
   // instruction stream but does not affect the FPU or machine

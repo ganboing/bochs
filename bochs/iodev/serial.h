@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: serial.h,v 1.18 2004-01-18 11:58:07 vruppert Exp $
+// $Id: serial.h,v 1.15 2003-11-16 08:21:10 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (C) 2004  MandrakeSoft S.A.
+//  Copyright (C) 2002  MandrakeSoft S.A.
 //
 //    MandrakeSoft S.A.
 //    43, rue d'Aboukir
@@ -28,23 +28,16 @@
 // Peter Grehan (grehan@iprg.nokia.com) coded most of this
 // serial emulation.
 
+#if USE_RAW_SERIAL
+#include "serial_raw.h"
+#endif // USE_RAW_SERIAL
+
 #if BX_USE_SER_SMF
 #  define BX_SER_SMF  static
 #  define BX_SER_THIS theSerialDevice->
 #else
 #  define BX_SER_SMF
 #  define BX_SER_THIS this->
-#endif
-
-#if USE_RAW_SERIAL
-#include "serial_raw.h"
-#endif // USE_RAW_SERIAL
-
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__) || defined(__GNU__) || defined(__APPLE__)
-#define SERIAL_ENABLE
-extern "C" {
-#include <termios.h>
-};
 #endif
 
 #define BX_SERIAL_MAXDEV   4
@@ -54,17 +47,6 @@ extern "C" {
 #define  BX_SER_RXIDLE  0
 #define  BX_SER_RXPOLL  1
 #define  BX_SER_RXWAIT  2
-
-#define BX_SER_THR  0
-#define BX_SER_RBR  0
-#define BX_SER_IER  1
-#define BX_SER_IIR  2
-#define BX_SER_FCR  2
-#define BX_SER_LCR  3
-#define BX_SER_MCR  4
-#define BX_SER_LSR  5
-#define BX_SER_MSR  6
-#define BX_SER_SCR  7
 
 enum {
   BX_SER_INT_IER,
@@ -100,14 +82,6 @@ typedef struct {
   int  rx_pollstate;
   int  rx_timer_index;
   int  fifo_timer_index;
-
-  int tty_id;
-
-#if USE_RAW_SERIAL
-  serial_raw* raw;
-#elif defined(SERIAL_ENABLE)
-  struct termios term_orig, term_new;
-#endif
 
   /*
    * Register definitions
@@ -188,9 +162,12 @@ public:
   ~bx_serial_c(void);
   virtual void   init(void);
   virtual void   reset(unsigned type);
+#if USE_RAW_SERIAL
+  serial_raw* raw;
+#endif // USE_RAW_SERIAL
 
 private:
-  bx_serial_t s[BX_SERIAL_MAXDEV];
+    bx_serial_t s[BX_SERIAL_MAXDEV];
 
   static void lower_interrupt(Bit8u port);
   static void raise_interrupt(Bit8u port, int type);

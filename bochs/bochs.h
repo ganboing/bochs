@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: bochs.h,v 1.136 2004-02-06 22:27:59 danielg4 Exp $
+// $Id: bochs.h,v 1.128.2.1 2004-02-06 22:14:25 danielg4 Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -160,7 +160,7 @@ int bx_begin_simulation (int argc, char *argv[]);
 #define BX_HRQ                      (bx_pc_system.HRQ)
 #define BX_MEM_READ_PHYSICAL(phy_addr, len, ptr) \
   BX_MEM(0)->readPhysicalPage(BX_CPU(0), phy_addr, len, ptr)
-#define BX_MEM_WRITE_PHYSICAL(phy_addr, len, ptr) \
+#define BX_MEM_WRITE_PHYSICAL(addr, len, ptr) \
   BX_MEM(0)->writePhysicalPage(BX_CPU(0), phy_addr, len, ptr)
 
 #if BX_SMP_PROCESSORS==1
@@ -301,10 +301,7 @@ enum {
   CPU2LOG, CPU3LOG, CPU4LOG, CPU5LOG, CPU6LOG, CPU7LOG, CPU8LOG, CPU9LOG,
   CPU10LOG, CPU11LOG, CPU12LOG, CPU13LOG, CPU14LOG, CPU15LOG, CTRLLOG,
   UNMAPLOG, SERRLOG, BIOSLOG, PIT81LOG, PIT82LOG, IODEBUGLOG, PCI2ISALOG,
-  PLUGINLOG, EXTFPUIRQLOG , PCIVGALOG, PCIUSBLOG, VTIMERLOG, STIMERLOG,
-  PCIDEVLOG,
-  PCIPNICLOG,
-  SPEAKERLOG,
+  PLUGINLOG, EXTFPUIRQLOG , PCIVGALOG, PCIUSBLOG, VTIMERLOG, STIMERLOG
 };
 
 class BOCHSAPI iofunctions {
@@ -455,9 +452,9 @@ typedef struct {
   bx_bool unsupported_io;
   bx_bool serial;
   bx_bool cdrom;
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
   bx_bool magic_break_enabled;
-#endif /* BX_MAGIC_BREAKPOINT */
+#endif /* MAGIC_BREAKPOINT */
 #if BX_SUPPORT_APIC
   bx_bool apic;
   bx_bool ioapic;
@@ -581,11 +578,6 @@ typedef struct {
   } bx_ne2k_options;
 
 typedef struct {
-  bx_param_num_c *Ovendor;
-  bx_param_num_c *Odevice;
-  } bx_pcidev_options;
-
-typedef struct {
 // These options are used for a special hack to load a
 // 32bit OS directly into memory, so it can be run without
 // any of the 16bit real mode or BIOS assistance.  This
@@ -631,8 +623,8 @@ typedef struct {
 #define BX_KBD_MF_TYPE        2 
 
 #define BX_N_OPTROM_IMAGES 4
-#define BX_N_SERIAL_PORTS 4
-#define BX_N_PARALLEL_PORTS 2
+#define BX_N_SERIAL_PORTS 1
+#define BX_N_PARALLEL_PORTS 1
 #define BX_N_USB_HUBS 1
 
 typedef struct BOCHSAPI {
@@ -645,7 +637,6 @@ typedef struct BOCHSAPI {
   // bx_cdrom_options  cdromd; 
   bx_serial_options com[BX_N_SERIAL_PORTS];
   bx_usb_options    usb[BX_N_USB_HUBS];
-  bx_pnic_options   pnic;
   bx_rom_options    rom;
   bx_vgarom_options vgarom;
   bx_rom_options    optrom[BX_N_OPTROM_IMAGES]; // Optional rom images 
@@ -669,7 +660,6 @@ typedef struct BOCHSAPI {
   bx_param_string_c *Oscreenmode;
 #endif
   bx_param_bool_c   *Oi440FXSupport;
-  bx_pcidev_options pcidev;
   bx_cmos_options   cmos;
   bx_clock_options  clock;
   bx_ne2k_options   ne2k;

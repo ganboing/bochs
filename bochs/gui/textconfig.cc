@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: textconfig.cc,v 1.22 2004-02-03 22:40:33 vruppert Exp $
+// $Id: textconfig.cc,v 1.18 2003-10-24 15:39:57 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 // This is code for a text-mode configuration interface.  Note that this file
@@ -13,8 +13,6 @@
 //
 
 #include "config.h"
-
-#if BX_USE_TEXTCONFIG
 
 extern "C" {
 #include <stdio.h>
@@ -273,7 +271,6 @@ static char *startup_options_prompt =
 "\n"
 "Please choose one: [0] ";
 
-#ifndef WIN32
 static char *runtime_menu_prompt =
 "---------------------\n"
 "Bochs Runtime Options\n"
@@ -296,7 +293,6 @@ static char *runtime_menu_prompt =
 "16. Quit now\n"
 "\n"
 "Please choose one:  [15] ";
-#endif
 
 #define NOT_IMPLEMENTED(choice) \
   fprintf (stderr, "ERROR: choice %d not implemented\n", choice);
@@ -305,7 +301,6 @@ static char *runtime_menu_prompt =
   do {fprintf (stderr, "ERROR: menu %d has no choice %d\n", menu, choice); \
       assert (0); } while (0)
 
-#ifndef WIN32
 void build_runtime_options_prompt (char *format, char *buf, int size)
 {
   bx_floppy_options floppyop;
@@ -343,7 +338,6 @@ void build_runtime_options_prompt (char *format, char *buf, int size)
       SIM->get_param_num (BXP_KBD_PASTE_DELAY)->get (),
       SIM->get_param_string (BXP_USER_SHORTCUT)->getptr ());
 }
-#endif
 
 int do_menu (bx_id id) {
   bx_list_c *menu = (bx_list_c *)SIM->get_param (id);
@@ -464,12 +458,8 @@ int bx_config_interface (int menu)
      char prompt[1024];
      bx_floppy_options floppyop;
      bx_atadevice_options cdromop;
-#ifdef WIN32
-     choice = RuntimeOptionsDialog();
-#else
      build_runtime_options_prompt (runtime_menu_prompt, prompt, 1024);
      if (ask_uint (prompt, 1, 16, 15, &choice, 10) < 0) return -1;
-#endif
      switch (choice) {
        case 1: 
          SIM->get_floppy_options (0, &floppyop);
@@ -506,7 +496,6 @@ int bx_config_interface (int menu)
        case 15: fprintf (stderr, "Continuing simulation\n"); return 0;
        case 16:
 	 fprintf (stderr, "You chose quit on the configuration interface.\n");
-         bx_user_quit = 1;
 	 SIM->quit_sim (1);
 	 return -1;
        default: fprintf (stderr, "Menu choice %d not implemented.\n", choice);
@@ -634,7 +623,7 @@ int bx_write_rc (char *rc)
 }
 
 char *log_action_ask_choices[] = { "cont", "alwayscont", "die", "abort", "debug" };
-int log_action_n_choices = 4 + (BX_DEBUGGER||BX_GDBSTUB?1:0);
+int log_action_n_choices = 4 + (BX_DEBUGGER?1:0);
 
 BxEvent *
 config_interface_notify_callback (void *unused, BxEvent *event)
@@ -658,7 +647,7 @@ config_interface_notify_callback (void *unused, BxEvent *event)
         opts = sparam->get_options()->get();
         if (opts & sparam->IS_FILENAME) {
           if (param->get_id() == BXP_NULL) {
-            event->retcode = AskFilename(GetBochsWindow(), (bx_param_filename_c *)sparam, "txt");
+            event->retcode = AskFilename(GetBochsWindow(), (bx_param_filename_c *)sparam);
           } else {
             event->retcode = FloppyDialog((bx_param_filename_c *)sparam);
           }
@@ -667,9 +656,6 @@ config_interface_notify_callback (void *unused, BxEvent *event)
           event->retcode = AskString(sparam);
           return event;
         }
-      } else if (param->get_type() == BXT_LIST) {
-        event->retcode = Cdrom1Dialog();
-        return event;
       }
 #endif
       event->u.param.param->text_ask (stdin, stderr);
@@ -694,10 +680,6 @@ config_interface_notify_callback (void *unused, BxEvent *event)
 #if BX_DEBUGGER
       fprintf (stderr, "  debug      - continue and return to bochs debugger\n");
 #endif
-#if BX_GDBSTUB
-      fprintf (stderr, "  debug      - hand control to gdb\n");
-#endif
-
       int choice;
 ask:
       if (ask_menu ("Choose one of the actions above: [%s] ", 
@@ -1011,5 +993,3 @@ int init_text_config_interface ()
   SIM->register_configuration_interface ("textconfig", ci_callback, NULL);
   return 0;  // success
 }
-
-#endif

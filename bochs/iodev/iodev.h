@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: iodev.h,v 1.41 2004-02-02 21:47:26 vruppert Exp $
+// $Id: iodev.h,v 1.37 2003-08-04 16:03:09 akrisak Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -9,8 +9,6 @@
 //    75002 Paris - France
 //    http://www.linux-mandrake.com/
 //    http://www.mandrakesoft.com/
-//
-//  I/O port handlers API Copyright (C) 2003 by Frank Cornelis
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -255,9 +253,6 @@ class BOCHSAPI bx_pci_stub_c : public bx_devmodel_c {
                                         Bit8u devfunc, const char *name) {
     STUBFUNC(pci, register_pci_handlers); return 0;
   }
-  virtual Bit8u find_free_devfunc() {
-	STUBFUNC(pci, find_free_devfunc); return 0;
-  }
   virtual Bit8u rd_memType (Bit32u addr) {
     return 0;
   }
@@ -270,12 +265,6 @@ class BOCHSAPI bx_pci_stub_c : public bx_devmodel_c {
 class BOCHSAPI bx_ne2k_stub_c : public bx_devmodel_c {
   public:
   virtual void print_info(FILE *file, int page, int reg, int nodups) {}
-};
-
-class BOCHSAPI bx_speaker_stub_c : public bx_devmodel_c {
-  public:
-  virtual void beep_on(float frequency) {}
-  virtual void beep_off() {}
 };
 
 class BOCHSAPI bx_devices_c : public logfunctions {
@@ -291,23 +280,8 @@ public:
   // power-on, hardware, or software.
   void reset(unsigned type);
   BX_MEM_C *mem;  // address space associated with these devices
-  bx_bool register_io_read_handler(void *this_ptr, bx_read_handler_t f, 
-		  Bit32u addr, const char *name, Bit8u mask );
-  bx_bool unregister_io_read_handler( void *this_ptr, bx_read_handler_t f,
-                                        Bit32u addr, Bit8u mask );
+  bx_bool register_io_read_handler(void *this_ptr, bx_read_handler_t f, Bit32u addr, const char *name, Bit8u mask );
   bx_bool register_io_write_handler(void *this_ptr, bx_write_handler_t f, Bit32u addr, const char *name, Bit8u mask );
-  bx_bool unregister_io_write_handler( void *this_ptr, bx_write_handler_t f,
-                                        Bit32u addr, Bit8u mask );
-  bx_bool register_io_read_handler_range( void *this_ptr, bx_read_handler_t f,
-		  Bit32u begin_addr, Bit32u end_addr, 
-		  const char *name, Bit8u mask );
-  bx_bool register_io_write_handler_range( void *this_ptr, bx_write_handler_t f,
-		  Bit32u begin_addr, Bit32u end_addr, 
-		  const char *name, Bit8u mask );
-  bx_bool unregister_io_read_handler_range( void *this_ptr, bx_read_handler_t f,
-                                        Bit32u begin, Bit32u end, Bit8u mask );
-  bx_bool unregister_io_write_handler_range( void *this_ptr, bx_write_handler_t f,
-                                        Bit32u begin, Bit32u end, Bit8u mask );
   bx_bool register_default_io_read_handler(void *this_ptr, bx_read_handler_t f, const char *name, Bit8u mask );
   bx_bool register_default_io_write_handler(void *this_ptr, bx_write_handler_t f, const char *name, Bit8u mask );
   bx_bool register_irq(unsigned irq, const char *name);
@@ -319,33 +293,30 @@ public:
   static void timer_handler(void *);
   void timer(void);
 
-  bx_devmodel_c     *pluginBiosDevice;
-  bx_ioapic_c       *ioapic;
-  bx_pci_stub_c     *pluginPciBridge;
-  bx_devmodel_c     *pluginPci2IsaBridge;
-  bx_devmodel_c     *pluginPciVgaAdapter;
-  bx_devmodel_c     *pluginPciDevAdapter;
-  bx_devmodel_c     *pluginPciUSBAdapter;
-  bx_devmodel_c	    *pluginPciPNicAdapter;
-  bx_pit_c          *pit;
-  bx_keyb_stub_c    *pluginKeyboard;
-  bx_dma_stub_c     *pluginDmaDevice;
-  bx_floppy_stub_c  *pluginFloppyDevice;
-  bx_cmos_stub_c    *pluginCmosDevice;
-  bx_devmodel_c     *pluginSerialDevice;
-  bx_devmodel_c     *pluginParallelDevice;
-  bx_devmodel_c     *pluginUnmapped;
-  bx_vga_stub_c     *pluginVgaDevice;
-  bx_pic_stub_c     *pluginPicDevice;
+  bx_devmodel_c    *pluginBiosDevice;
+  bx_ioapic_c      *ioapic;
+  bx_pci_stub_c    *pluginPciBridge;
+  bx_devmodel_c    *pluginPci2IsaBridge;
+  bx_devmodel_c    *pluginPciVgaAdapter;
+  bx_devmodel_c    *pluginPciUSBAdapter;
+  bx_pit_c         *pit;
+  bx_keyb_stub_c   *pluginKeyboard;
+  bx_dma_stub_c    *pluginDmaDevice;
+  bx_floppy_stub_c *pluginFloppyDevice;
+  bx_cmos_stub_c   *pluginCmosDevice;
+  bx_devmodel_c    *pluginSerialDevice;
+  bx_devmodel_c    *pluginParallelDevice;
+  bx_devmodel_c    *pluginUnmapped;
+  bx_vga_stub_c    *pluginVgaDevice;
+  bx_pic_stub_c    *pluginPicDevice;
   bx_hard_drive_stub_c *pluginHardDrive;
-  bx_devmodel_c     *pluginSB16Device;
-  bx_ne2k_stub_c    *pluginNE2kDevice;
-  bx_g2h_c          *g2h;
-  bx_devmodel_c     *pluginExtFpuIrq;
-  bx_devmodel_c     *pluginGameport;
-  bx_speaker_stub_c *pluginSpeaker;
+  bx_devmodel_c    *pluginSB16Device;
+  bx_ne2k_stub_c   *pluginNE2kDevice;
+  bx_g2h_c         *g2h;
+  bx_devmodel_c    *pluginExtFpuIrq;
+  bx_devmodel_c    *pluginGameport;
 #if BX_IODEBUG_SUPPORT
-  bx_iodebug_c	    *iodebug;
+  bx_iodebug_c	   *iodebug;
 #endif
 
   // stub classes that the pointers (above) can point to until a plugin is
@@ -359,7 +330,6 @@ public:
   bx_vga_stub_c  stubVga;
   bx_pci_stub_c  stubPci;
   bx_ne2k_stub_c stubNE2k;
-  bx_speaker_stub_c stubSpeaker;
 
   // Some info to pass to devices which can handled bulk IO.  This allows
   // the interface to remain the same for IO devices which can't handle
@@ -373,21 +343,24 @@ public:
 
 private:
 
-  struct io_handler_struct {
-	struct io_handler_struct *next;
-	struct io_handler_struct *prev;	
-	void *funct; // C++ type checking is great, but annoying
-	void *this_ptr;
-	const char *handler_name;  // name of device
-	int usage_count;
-	Bit8u mask;          // io_len mask
-  };
-  struct io_handler_struct io_read_handlers;
-  struct io_handler_struct io_write_handlers;
-#define PORTS 0x10000
-  struct io_handler_struct **read_port_to_handler;
-  struct io_handler_struct **write_port_to_handler;
-  
+  Bit8u                 read_handler_id[0x10000];  // 64K
+  struct {
+    bx_read_handler_t funct;
+    void             *this_ptr;
+    const char       *handler_name;  // name of device
+    Bit8u             mask;          // io_len mask
+    } io_read_handler[BX_MAX_IO_DEVICES];
+  unsigned              num_read_handles;
+
+  Bit8u                 write_handler_id[0x10000]; // 64K
+  struct {
+    bx_write_handler_t funct;
+    void              *this_ptr;
+    const char        *handler_name;  // name of device
+    Bit8u              mask;          // io_len mask
+    } io_write_handler[BX_MAX_IO_DEVICES];
+  unsigned              num_write_handles;
+
   // more for informative purposes, the names of the devices which
   // are use each of the IRQ 0..15 lines are stored here
   const char *irq_handler_name[BX_MAX_IRQS];
@@ -413,9 +386,6 @@ private:
 #include "iodev/pci2isa.h"
 #if BX_PCI_VGA_SUPPORT
 #include "iodev/pcivga.h"
-#endif
-#if BX_PCI_DEV_SUPPORT
-#include "iodev/pcidev.h"
 #endif
 #if BX_PCI_USB_SUPPORT
 #include "iodev/pciusb.h"
@@ -447,11 +417,7 @@ private:
 #include "iodev/unmapped.h"
 #include "iodev/eth.h"
 #include "iodev/ne2k.h"
-#if BX_PCI_PNIC_SUPPORT
-#include "iodev/pcipnic.h"
-#endif
 #include "iodev/guest2host.h"
 #include "iodev/slowdown_timer.h"
 #include "iodev/extfpuirq.h"
 #include "iodev/gameport.h"
-#include "iodev/speaker.h"

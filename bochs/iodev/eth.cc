@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: eth.cc,v 1.18 2004-01-16 15:53:43 danielg4 Exp $
+// $Id: eth.cc,v 1.16 2003-04-28 13:01:09 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -70,16 +70,12 @@ extern class bx_tap_locator_c bx_tap_match;
 #if HAVE_TUNTAP
 extern class bx_tuntap_locator_c bx_tuntap_match;
 #endif
-#if HAVE_VDE
-extern class bx_vde_locator_c bx_vde_match;
-#endif
 #ifdef ETH_TEST
 extern bx_test_match;
 #endif
 #ifdef ETH_ARPBACK
 extern class bx_arpback_locator_c bx_arpback_match;
 #endif
-extern class bx_vnet_locator_c bx_vnet_match;
 
 //
 // Called by ethernet chip emulations to locate and create a pktmover
@@ -128,12 +124,6 @@ eth_locator_c::create(const char *type, const char *netif,
       ptr = (eth_locator_c *) &bx_tuntap_match;
   }
 #endif
-#if HAVE_VDE
-  {
-    if (!strcmp(type, "vde"))    
-      ptr = (eth_locator_c *) &bx_vde_match;
-  }
-#endif
 #if HAVE_ETHERTAP
   {
     if (!strcmp(type, "tap"))    
@@ -152,10 +142,6 @@ eth_locator_c::create(const char *type, const char *netif,
       ptr = (eth_locator_c *) &bx_test_match;
   }
 #endif
-  {
-    if (!strcmp(type, "vnet"))    
-      ptr = (eth_locator_c *) &bx_vnet_match;
-  }
   if (ptr)
     return (ptr->allocate(netif, macaddr, rxh, rxarg));
 #endif
@@ -163,7 +149,7 @@ eth_locator_c::create(const char *type, const char *netif,
   return (NULL);
 }
 
-#if (HAVE_ETHERTAP==1) || (HAVE_TUNTAP==1) || (HAVE_VDE==1)
+#if (HAVE_ETHERTAP==1) || (HAVE_TUNTAP==1)
 
 extern "C" {
 #include <sys/wait.h>

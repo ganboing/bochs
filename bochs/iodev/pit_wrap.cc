@@ -1,5 +1,5 @@
-///////////////////////////////////////////////////////////////////////
-// $Id: pit_wrap.cc,v 1.54 2004-02-01 23:42:04 cbothamy Exp $
+////////////////////////////////////////////////////////////////////////
+// $Id: pit_wrap.cc,v 1.52 2003-08-19 00:10:38 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -313,11 +313,6 @@ bx_pit_c::write( Bit32u   address, Bit32u   dvalue,
 
     case 0x61:
       BX_PIT_THIS s.speaker_data_on = (value >> 1) & 0x01;
-      if ( BX_PIT_THIS s.speaker_data_on ) {
-	  DEV_speaker_beep_on(1193180.0 / this->get_timer(2));
-      } else {
-	  DEV_speaker_beep_off();
-      }
 /*??? only on AT+ */
       BX_PIT_THIS s.timer.set_GATE(2, value & 0x01);
 #if BX_CPU_LEVEL < 2

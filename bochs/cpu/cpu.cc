@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: cpu.cc,v 1.83 2004-01-29 17:49:03 mcb30 Exp $
+// $Id: cpu.cc,v 1.81 2003-10-09 19:05:11 sshwarts Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -115,7 +115,7 @@ BX_CPU_C::cpu_loop(Bit32s max_instr_count)
 
 #if BX_DEBUGGER
   BX_CPU_THIS_PTR break_point = 0;
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
   BX_CPU_THIS_PTR magic_break = 0;
 #endif
   BX_CPU_THIS_PTR stop_reason = STOP_NO_REASON;
@@ -127,11 +127,6 @@ BX_CPU_C::cpu_loop(Bit32s max_instr_count)
     // only from exception function can we get here ...
     BX_INSTR_NEW_INSTRUCTION(BX_CPU_ID);
   }
-#elif BX_GDBSTUB
-  if (setjmp( BX_CPU_THIS_PTR jmp_buf_env ))
-  {
-    return;
-  }
 #else
   (void) setjmp( BX_CPU_THIS_PTR jmp_buf_env );
 #endif
@@ -141,7 +136,6 @@ BX_CPU_C::cpu_loop(Bit32s max_instr_count)
   // the debugger may request that control is returned to it so that
   // the situation may be examined.
   if (bx_guard.special_unwind_stack) {
-printf("CPU_LOOP %d\n", bx_guard.special_unwind_stack);
     return;
     }
 #endif
@@ -461,7 +455,7 @@ debugger_check:
           BX_PANIC(("Weird break point condition"));
         }
       }
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
     // (mch) Magic break point support
     if (BX_CPU_THIS_PTR magic_break) {
       if (bx_dbg.magic_break_enabled) {

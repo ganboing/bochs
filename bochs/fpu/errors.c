@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------+
  |  errors.c                                                                 |
- |  $Id: errors.c,v 1.17 2004-02-11 19:40:25 sshwarts Exp $
+ |  $Id: errors.c,v 1.15.2.1 2004-02-06 22:14:35 danielg4 Exp $
  |                                                                           |
  |  The error handling functions for wm-FPU-emu                              |
  |                                                                           |
@@ -99,6 +99,9 @@ printk(" CW: ic=%d rc=%ld%ld pc=%ld%ld iem=%d     ef=%d%d%d%d%d%d\n",
 	}
       printk("%s\n", tag_desc[(int) (unsigned) tagi]);
     }
+
+  RE_ENTRANT_CHECK_ON;
+
 }
 #endif
 

@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: cpu.h,v 1.158 2004-01-31 13:43:25 sshwarts Exp $
+// $Id: cpu.h,v 1.155 2003-12-30 22:12:45 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2001  MandrakeSoft S.A.
@@ -1367,7 +1367,7 @@ union {
 #if BX_DEBUGGER
   Bit32u watchpoint;
   Bit8u break_point;
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
   Bit8u magic_break;
 #endif
   Bit8u stop_reason;
@@ -1378,10 +1378,6 @@ union {
   Bit8u show_eip;   /* BW record eip at special instr f.ex eip */
   Bit8u show_flag;  /* BW shows instr class executed */
   bx_guard_found_t guard_found;
-#endif
-
-#if BX_GDBSTUB
-  Bit8u ispanic;
 #endif
 
 #if BX_SUPPORT_X86_64
@@ -2082,7 +2078,6 @@ union {
 
 #if BX_SUPPORT_FPU
   BX_SMF void prepareFPU(void);
-  BX_SMF void FPU_check_pending_exceptions(void);
   BX_SMF void print_state_FPU(void);
 #endif
 

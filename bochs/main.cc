@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: main.cc,v 1.267 2004-02-08 11:00:46 cbothamy Exp $
+// $Id: main.cc,v 1.256.2.3 2004-02-08 14:39:50 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -1133,9 +1133,7 @@ void bx_init_options ()
   bx_options.Oscreenmode->set_handler (bx_param_string_handler);
 #endif
   static char *config_interface_list[] = {
-#if BX_USE_TEXTCONFIG
     "textconfig",
-#endif
 #if BX_WITH_WX
     "wx",
 #endif
@@ -1217,27 +1215,6 @@ void bx_init_options ()
   menu = new bx_list_c (BXP_MENU_INTERFACE, "Bochs Interface Menu", "intfmenu", interface_init_list);
   menu->get_options ()->set (menu->SHOW_PARENT);
 
-  // pcidev options
-  bx_options.pcidev.Ovendor = new bx_param_num_c(BXP_PCIDEV_VENDOR,
-      "PCI Vendor ID",
-      "The vendor ID of the host PCI device to map",
-      0, 0xffff,
-      0xffff); // vendor id 0xffff = no pci device present
-  bx_options.pcidev.Odevice = new bx_param_num_c(BXP_PCIDEV_DEVICE,
-      "PCI Device ID",
-      "The device ID of the host PCI device to map",
-      0, 0xffff,
-      0x0);
-  /*
-  bx_param_c *pcidev_init_list[] = {
-    bx_options.pcidev.Ovendor,
-    bx_options.pcidev.Odevice,
-    NULL
-  };
-  menu = new bx_list_c (BXP_PCIDEV, "Host PCI Device Mapping Configuration", "", pcidev_init_list);
-  menu->get_options ()->set (menu->SHOW_PARENT);
-  */
-
   // NE2K options
   bx_options.ne2k.Opresent = new bx_param_bool_c (BXP_NE2K_PRESENT,
       "Enable NE2K NIC emulation",
@@ -1281,7 +1258,6 @@ void bx_init_options ()
 #ifdef ETH_ARPBACK
     "arpback",
 #endif
-    "vnet",
     NULL
   };
   bx_options.ne2k.Oethmod = new bx_param_enum_c (BXP_NE2K_ETHMOD,
@@ -1302,46 +1278,6 @@ void bx_init_options ()
 #if !BX_WITH_WX
   bx_options.ne2k.Oscript->set_ask_format ("Enter new script name, or 'none': [%s] ");
 #endif
-  bx_options.pnic.Oenabled = new bx_param_bool_c (BXP_PNIC_ENABLED,
-      "Enable Pseudo NIC emulation",
-      "Enables the Pseudo NIC emulation",
-      0);
-  bx_options.pnic.Oioaddr = new bx_param_num_c (BXP_PNIC_IOADDR,
-      "Pseudo NIC I/O Address",
-      "I/O base address of the emulated Pseudo NIC device",
-      0, 0xffff,
-      0xdc00);
-  bx_options.pnic.Oioaddr->set_base (16);
-  bx_options.pnic.Oirq = new bx_param_num_c (BXP_PNIC_IRQ,
-      "Pseudo NIC Interrupt",
-      "IRQ used by the Pseudo NIC device",
-      0, 15,
-      11);
-  bx_options.pnic.Oirq->set_options (bx_param_num_c::USE_SPIN_CONTROL);
-  bx_options.pnic.Omacaddr = new bx_param_string_c (BXP_PNIC_MACADDR,
-      "MAC Address",
-      "MAC address of the Pseudo NIC device. Don't use an address of a machine on your net.",
-      "\xfe\xfd\xde\xad\xbe\xef", 6);
-  bx_options.pnic.Omacaddr->get_options ()->set (bx_options.pnic.Omacaddr->RAW_BYTES);
-  bx_options.pnic.Omacaddr->set_separator (':');
-  bx_options.pnic.Oethmod = new bx_param_enum_c (BXP_PNIC_ETHMOD,
-      "Ethernet module",
-      "Module used for the connection to the real net.",
-       eth_module_list,
-       0,
-       0);
-  bx_options.pnic.Oethmod->set_by_name ("null");
-  bx_options.pnic.Oethdev = new bx_param_string_c (BXP_PNIC_ETHDEV,
-      "Ethernet device",
-      "Device used for the connection to the real net. This is only valid if an ethernet module other than 'null' is used.",
-      "xl0", BX_PATHNAME_LEN);
-  bx_options.pnic.Oscript = new bx_param_string_c (BXP_PNIC_SCRIPT,
-      "Device configuration script",
-      "Name of the script that is executed after Bochs initializes the network interface (optional).",
-      "none", BX_PATHNAME_LEN);
-#if !BX_WITH_WX
-  bx_options.pnic.Oscript->set_ask_format ("Enter new script name, or 'none': [%s] ");
-#endif
   bx_param_c *ne2k_init_list[] = {
     bx_options.ne2k.Opresent,
     bx_options.ne2k.Oioaddr,
@@ -1350,13 +1286,6 @@ void bx_init_options ()
     bx_options.ne2k.Oethmod,
     bx_options.ne2k.Oethdev,
     bx_options.ne2k.Oscript,
-    bx_options.pnic.Oenabled,
-    bx_options.pnic.Oioaddr,
-    bx_options.pnic.Oirq,
-    bx_options.pnic.Omacaddr,
-    bx_options.pnic.Oethmod,
-    bx_options.pnic.Oethdev,
-    bx_options.pnic.Oscript,
     NULL
   };
   menu = new bx_list_c (BXP_NE2K, "NE2K Configuration", "", ne2k_init_list);
@@ -1576,7 +1505,6 @@ void bx_init_options ()
       "Userbutton shortcut",
       "Defines the keyboard shortcut to be sent when you press the 'user' button in the headerbar.",
       "none", 16);
-  bx_options.Ouser_shortcut->set_runtime_param (1);
 
   // GDB stub
   bx_options.gdbstub.port = 1234;
@@ -1634,8 +1562,6 @@ void bx_init_options ()
 
 void bx_reset_options ()
 {
-  Bit8u i;
-
   // drives
   bx_options.floppya.Opath->reset();
   bx_options.floppya.Odevtype->reset();
@@ -1674,14 +1600,10 @@ void bx_reset_options ()
   bx_options.memory.Osize->reset();
 
   // standard ports
-  for (i=0; i<BX_N_SERIAL_PORTS; i++) {
-    bx_options.com[i].Oenabled->reset();
-    bx_options.com[i].Odev->reset();
-    }
-  for (i=0; i<BX_N_PARALLEL_PORTS; i++) {
-    bx_options.par[i].Oenabled->reset();
-    bx_options.par[i].Ooutfile->reset();
-    }
+  bx_options.com[0].Oenabled->reset();
+  bx_options.com[0].Odev->reset();
+  bx_options.par[0].Oenabled->reset();
+  bx_options.par[0].Ooutfile->reset();
 
   // rom images
   bx_options.rom.Opath->reset();
@@ -1715,10 +1637,6 @@ void bx_reset_options ()
   bx_options.ne2k.Oethdev->reset();
   bx_options.ne2k.Oscript->reset();
 
-  // pcidev
-  bx_options.pcidev.Ovendor->reset();
-  bx_options.pcidev.Odevice->reset();
-  
   // SB16
   bx_options.sb16.Opresent->reset();
   bx_options.sb16.Omidifile->reset();
@@ -1856,11 +1774,7 @@ int bxmain () {
     bx_param_enum_c *ci_param = SIM->get_param_enum (BXP_SEL_CONFIG_INTERFACE);
     char *ci_name = ci_param->get_choice (ci_param->get ());
     if (!strcmp(ci_name, "textconfig")) {
-#if BX_USE_TEXTCONFIG
       init_text_config_interface ();   // in textconfig.h
-#else
-      BX_PANIC(("configuration interface 'textconfig' not present"));
-#endif
     }
 #if BX_WITH_WX
     else if (!strcmp(ci_name, "wx")) {
@@ -2396,8 +2310,6 @@ bx_begin_simulation (int argc, char *argv[])
 
   // update headerbar buttons since drive status can change during init
   bx_gui->update_drive_status_buttons ();
-  // iniialize statusbar and set all items inactive
-  bx_gui->statusbar_setitem(-1, 0);
 
   // The set handler for mouse_enabled does not actually update the gui
   // until init_done is set.  This forces the set handler to be called,
@@ -2638,7 +2550,7 @@ bx_init_bx_dbg (void)
   bx_dbg.record_io = 0;
   bx_dbg.serial = 0;
   bx_dbg.cdrom = 0;
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
   bx_dbg.magic_break_enabled = 0;
 #endif
 
@@ -3368,6 +3280,7 @@ parse_line_formatted(char *context, int num_params, char *params[])
         }
       }
     }
+#if 0
   else if (!strcmp(params[0], "com2")) {
     for (i=1; i<num_params; i++) {
       if (!strncmp(params[i], "enabled=", 8)) {
@@ -3410,6 +3323,7 @@ parse_line_formatted(char *context, int num_params, char *params[])
         }
       }
     }
+#endif
   else if (!strcmp(params[0], "usb1")) {
     for (i=1; i<num_params; i++) {
       if (!strncmp(params[i], "enabled=", 8)) {
@@ -3427,55 +3341,6 @@ parse_line_formatted(char *context, int num_params, char *params[])
         }
       else {
         PARSE_ERR(("%s: unknown parameter for usb1 ignored.", context));
-        }
-      }
-    }
-  else if (!strcmp(params[0], "pnic")) {
-    int tmp[6];
-    char tmpchar[6];
-    int valid = 0;
-    int n;
-    for (i=1; i<num_params; i++) {
-      if (!strncmp(params[i], "enabled=", 8)) {
-        bx_options.pnic.Oenabled->set (atol(&params[i][8]));
-	if ( bx_options.pnic.Oenabled->get() ) {
-		// Force ne2k to be enabled
-		bx_options.ne2k.Opresent->set (1);
-          }
-        }
-      else if (!strncmp(params[i], "ioaddr=", 7)) {
-        if ( (params[i][7] == '0') && (params[i][8] == 'x') )
-          bx_options.pnic.Oioaddr->set (strtoul (&params[i][7], NULL, 16));
-        else
-          bx_options.pnic.Oioaddr->set (strtoul (&params[i][7], NULL, 10));
-        bx_options.pnic.Oenabled->set (1);
-        }
-      else if (!strncmp(params[i], "irq=", 4)) {
-        bx_options.pnic.Oirq->set (atol(&params[i][4]));
-        }
-      else if (!strncmp(params[i], "mac=", 4)) {
-        n = sscanf(&params[i][4], "%x:%x:%x:%x:%x:%x",
-                   &tmp[0],&tmp[1],&tmp[2],&tmp[3],&tmp[4],&tmp[5]);
-        if (n != 6) {
-          PARSE_ERR(("%s: pnic mac address malformed.", context));
-        }
-        for (n=0;n<6;n++)
-          tmpchar[n] = (unsigned char)tmp[n];
-        bx_options.pnic.Omacaddr->set (tmpchar);
-        valid |= 0x04;
-        }
-      else if (!strncmp(params[i], "ethmod=", 7)) {
-        if (!bx_options.pnic.Oethmod->set_by_name (strdup(&params[i][7])))
-          PARSE_ERR(("%s: ethernet module '%s' not available", context, strdup(&params[i][7])));
-        }
-      else if (!strncmp(params[i], "ethdev=", 7)) {
-        bx_options.pnic.Oethdev->set (strdup(&params[i][7]));
-        }
-      else if (!strncmp(params[i], "script=", 7)) {
-        bx_options.pnic.Oscript->set (strdup(&params[i][7]));
-        }
-      else {
-        PARSE_ERR(("%s: unknown parameter for pnic ignored.", context));
         }
       }
     }
@@ -3878,6 +3743,7 @@ parse_line_formatted(char *context, int num_params, char *params[])
     }
   }
 
+#if 0
   else if (!strcmp(params[0], "parport2")) {
     for (i=1; i<num_params; i++) {
       if (!strncmp(params[i], "enabled=", 8)) {
@@ -3892,6 +3758,7 @@ parse_line_formatted(char *context, int num_params, char *params[])
         }
     }
   }
+#endif
 
   else if (!strcmp(params[0], "i440fxsupport")) {
     if (num_params != 2) {
@@ -3908,28 +3775,6 @@ parse_line_formatted(char *context, int num_params, char *params[])
       PARSE_ERR(("%s: i440FXSupport directive malformed.", context));
       }
     }
-  else if (!strcmp(params[0], "pcidev")) {
-    if (num_params != 3) {
-      PARSE_ERR(("%s: pcidev directive malformed.", context));
-    }
-    for (i=1; i<num_params; i++) {
-      if (!strncmp(params[i], "vendor=", 7)) {
-        if ( (params[i][7] == '0') && (toupper(params[i][8]) == 'X') )
-          bx_options.pcidev.Ovendor->set (strtoul (&params[i][7], NULL, 16));
-        else
-          bx_options.pcidev.Ovendor->set (strtoul (&params[i][7], NULL, 10));
-      }
-      else if (!strncmp(params[i], "device=", 7)) {
-        if ( (params[i][7] == '0') && (toupper(params[i][8]) == 'X') )
-          bx_options.pcidev.Odevice->set (strtoul (&params[i][7], NULL, 16));
-        else
-          bx_options.pcidev.Odevice->set (strtoul (&params[i][7], NULL, 10));
-      }
-      else {
-        BX_ERROR(("%s: unknown parameter for pcidev ignored.", context));
-      }
-    }
-  }
   else if (!strcmp(params[0], "newharddrivesupport")) {
     if (num_params != 2) {
       PARSE_ERR(("%s: newharddrivesupport directive malformed.", context));
@@ -3978,7 +3823,7 @@ parse_line_formatted(char *context, int num_params, char *params[])
         }
       }
     }
-#if BX_MAGIC_BREAKPOINT
+#ifdef MAGIC_BREAKPOINT
   else if (!strcmp(params[0], "magic_break")) {
     if (num_params != 2) {
       PARSE_ERR(("%s: magic_break directive: wrong # args.", context));
@@ -4311,29 +4156,6 @@ bx_write_usb_options (FILE *fp, bx_usb_options *opt, int n)
 }
 
 int
-bx_write_pnic_options (FILE *fp, bx_pnic_options *opt)
-{
-  fprintf (fp, "pnic: enabled=%d", opt->Oenabled->get ());
-  if (opt->Oenabled->get ()) {
-    char *ptr = opt->Omacaddr->getptr ();
-    fprintf (fp, ", ioaddr=0x%04x, irq=%d, mac=%02x:%02x:%02x:%02x:%02x:%02x, ethmod=%s, ethdev=%s, script=%s",
-	     opt->Oioaddr->get (),
-	     opt->Oirq->get (),
-	     (unsigned int)(0xff & ptr[0]),
-	     (unsigned int)(0xff & ptr[1]),
-	     (unsigned int)(0xff & ptr[2]),
-	     (unsigned int)(0xff & ptr[3]),
-	     (unsigned int)(0xff & ptr[4]),
-	     (unsigned int)(0xff & ptr[5]),
-	     opt->Oethmod->get_choice(opt->Oethmod->get()),
-	     opt->Oethdev->getptr (),
-	     opt->Oscript->getptr () );
-  }
-  fprintf (fp, "\n");
-  return 0;
-}
-
-int
 bx_write_sb16_options (FILE *fp, bx_sb16_options *opt)
 {
   if (!opt->Opresent->get ()) {
@@ -4519,7 +4341,6 @@ bx_write_configuration (char *rc, int overwrite)
   fprintf (fp, "i440fxsupport: enabled=%d\n", bx_options.Oi440FXSupport->get ());
   bx_write_clock_options (fp, &bx_options.clock);
   bx_write_ne2k_options (fp, &bx_options.ne2k);
-  bx_write_pnic_options (fp, &bx_options.pnic);
   fprintf (fp, "newharddrivesupport: enabled=%d\n", bx_options.OnewHardDriveSupport->get ());
   bx_write_loader_options (fp, &bx_options.load32bitOSImage);
   bx_write_log_options (fp, &bx_options.log);

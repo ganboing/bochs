@@ -20,7 +20,7 @@ export CXXFLAGS
 
 ./configure --target=ppc-macos \
                 --enable-cdrom \
-                --enable-sb16=osx \
+                --enable-sb16=dummy \
                 --enable-vbe \
                 --enable-all-optimizations \
                 ${CONFIGURE_ARGS} \

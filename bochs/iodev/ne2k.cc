@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: ne2k.cc,v 1.57 2004-01-19 17:53:53 vruppert Exp $
+// $Id: ne2k.cc,v 1.56.2.1 2004-02-02 22:37:22 cbothamy Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -1275,7 +1275,7 @@ bx_ne2k_c::rx_frame(const void *buf, unsigned io_len)
 void
 bx_ne2k_c::init(void)
 {
-  BX_DEBUG(("Init $Id: ne2k.cc,v 1.57 2004-01-19 17:53:53 vruppert Exp $"));
+  BX_DEBUG(("Init $Id: ne2k.cc,v 1.56.2.1 2004-02-02 22:37:22 cbothamy Exp $"));
 
   // Read in values from config file
   BX_NE2K_THIS s.base_address = bx_options.ne2k.Oioaddr->get ();

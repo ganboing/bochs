@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: harddrv.h,v 1.25 2004-02-09 18:59:50 vruppert Exp $
+// $Id: harddrv.h,v 1.22.2.1 2004-02-06 22:14:36 danielg4 Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -707,9 +707,6 @@ public:
   static Bit32u read_handler(void *this_ptr, Bit32u address, unsigned io_len);
   static void   write_handler(void *this_ptr, Bit32u address, Bit32u value, unsigned io_len);
 
-  static void iolight_timer_handler(void *);
-  BX_HD_SMF void iolight_timer(void);
-
 private:
 
   BX_HD_SMF bx_bool calculate_logical_address(Bit8u channel, off_t *sector) BX_CPP_AttrRegparmN(2);
@@ -744,8 +741,6 @@ private:
       atapi_t atapi;
 
       Bit8u model_no[41];
-      int statusbar_id;
-      int iolight_counter;
       } drives[2];
     unsigned drive_select;
 
@@ -754,8 +749,6 @@ private:
     Bit8u  irq;
 
     } channels[BX_MAX_ATA_CHANNEL];
-
-  int iolight_timer_index;
 
 #if BX_PDC20230C_VLBIDE_SUPPORT
 // pdc20630c is only available for 1st ata channel

@@ -41,7 +41,7 @@ struct i387_t
     unsigned char tos;
     unsigned char no_update;
     unsigned char rm;
-    unsigned char align8;
+    unsigned align8;
 
     Bit64u st_space[16]; // 8*16 bytes per FP-reg (aligned) = 128 bytes
 };
@@ -83,7 +83,6 @@ typedef struct bx_fpu_reg_t FPU_REG;
     (BX_CPU_THIS_PTR the_i387.st_space[index*2])
 
 #define FPU_PARTIAL_STATUS     (BX_CPU_THIS_PTR the_i387.swd)
-#define FPU_CONTROL_WORD       (BX_CPU_THIS_PTR the_i387.cwd)
 #define FPU_TAG_WORD           (BX_CPU_THIS_PTR the_i387.twd)
 #define FPU_TOS                (BX_CPU_THIS_PTR the_i387.tos)
 
