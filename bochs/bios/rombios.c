@@ -256,7 +256,7 @@ static void           keyboard_panic();
 static void           boot_failure_msg();
 static void           nmi_handler_msg();
 static void           print_bios_banner();
-static char bios_version_string[] = "BIOS Version is $Id: rombios.c,v 1.10 2001-05-31 20:36:05 bdenney Exp $";
+static char bios_version_string[] = "BIOS Version is $Id: rombios.c,v 1.6.2.3 2001-05-31 20:34:24 bdenney Exp $";
 
 #define DEBUG_ROMBIOS 0
 
