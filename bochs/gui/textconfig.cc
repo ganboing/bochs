@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: textconfig.cc,v 1.30 2005-06-06 20:14:50 vruppert Exp $
+// $Id: textconfig.cc,v 1.29.2.1 2005-07-07 07:20:19 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 // This is code for a text-mode configuration interface.  Note that this file

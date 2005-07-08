@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: misc_mem.cc,v 1.61 2005-07-07 16:57:53 vruppert Exp $
+// $Id: misc_mem.cc,v 1.59.2.2 2005-07-07 16:59:29 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -95,7 +95,7 @@ void BX_MEM_C::init_memory(int memsize)
 {
   int idx;
 
-  BX_DEBUG(("Init $Id: misc_mem.cc,v 1.61 2005-07-07 16:57:53 vruppert Exp $"));
+  BX_DEBUG(("Init $Id: misc_mem.cc,v 1.59.2.2 2005-07-07 16:59:29 vruppert Exp $"));
   // you can pass 0 if memory has been allocated already through
   // the constructor, or the desired size of memory if it hasn't
   // BX_INFO(("%.2fMB", (float)(BX_MEM_THIS megabytes) ));

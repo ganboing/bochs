@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: harddrv.cc,v 1.136 2005-06-26 10:54:49 vruppert Exp $
+// $Id: harddrv.cc,v 1.132.2.1 2005-07-06 21:02:15 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
@@ -149,7 +149,7 @@ bx_hard_drive_c::init(void)
   char  string[5];
   char  sbtext[8];
 
-  BX_DEBUG(("Init $Id: harddrv.cc,v 1.136 2005-06-26 10:54:49 vruppert Exp $"));
+  BX_DEBUG(("Init $Id: harddrv.cc,v 1.132.2.1 2005-07-06 21:02:15 vruppert Exp $"));
 
   for (channel=0; channel<BX_MAX_ATA_CHANNEL; channel++) {
     if (bx_options.ata[channel].Opresent->get() == 1) {
