@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: rfb.cc,v 1.65 2009-06-03 17:05:22 vruppert Exp $
+// $Id: rfb.cc,v 1.63 2009-02-08 09:05:52 vruppert Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2000  Psyon.Org!
@@ -24,6 +24,7 @@
 // RFB still to do :
 // - properly handle SetPixelFormat, including big/little-endian flag
 // - depth > 8bpp support
+// - full dimension update support (desktop size should be an option)
 // - optional compression support
 
 
@@ -32,8 +33,8 @@
 // is used to know when we are exporting symbols and when we are importing.
 #define BX_PLUGGABLE
 
+#include "bochs.h"
 #include "iodev.h"
-#include "keymap.h"
 #if BX_WITH_RFB
 
 #include "icon_bochs.h"
@@ -57,7 +58,6 @@ public:
 };
 
 void rfbSetStatusText(int element, const char *text, bx_bool active, bx_bool w=0);
-static Bit32u convertStringToRfbKey(const char *string);
 
 // declare one instance of the gui object and call macro to insert the
 // plugin code
@@ -67,7 +67,6 @@ IMPLEMENT_GUI_PLUGIN_CODE(rfb)
 #define LOG_THIS theGui->
 
 #include "rfb.h"
-#include "rfbkeys.h"
 
 #ifdef WIN32
 
@@ -96,7 +95,6 @@ typedef int SOCKET;
 
 static bool keep_alive;
 static bool client_connected;
-static bool desktop_resizable;
 
 #define BX_RFB_PORT_MIN 5900
 #define BX_RFB_PORT_MAX 5949
@@ -142,10 +140,8 @@ static struct {
     bool updated;
 } rfbUpdateRegion;
 
-#define BX_RFB_MAX_XDIM 1024
-#define BX_RFB_MAX_YDIM 768
-#define BX_RFB_DEF_XDIM 720
-#define BX_RFB_DEF_YDIM 480
+#define BX_RFB_MAX_XDIM 720
+#define BX_RFB_MAX_YDIM 480
 
 static char  *rfbScreen;
 static char  rfbPalette[256];
@@ -183,7 +179,7 @@ int  WriteExact(int sock, char *buf, int len);
 void DrawBitmap(int x, int y, int width, int height, char *bmap, char color, bool update_client);
 void DrawChar(int x, int y, int width, int height, int fonty, char *bmap, char color, bx_bool gfxchar);
 void UpdateScreen(unsigned char *newBits, int x, int y, int width, int height, bool update_client);
-void SendUpdate(int x, int y, int width, int height, Bit32u encoding);
+void SendUpdate(int x, int y, int width, int height);
 void StartThread();
 void rfbKeyPressed(Bit32u key, int press_release);
 void rfbMouseMove(int x, int y, int bmask);
@@ -221,9 +217,12 @@ void bx_rfb_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsi
   put("RFB");
   UNUSED(bochs_icon_bits);
 
+  // the ask menu doesn't work on the client side
+  io->set_log_action(LOGLEV_PANIC, ACT_FATAL);
+
   rfbHeaderbarY = headerbar_y;
-  rfbDimensionX = BX_RFB_DEF_XDIM;
-  rfbDimensionY = BX_RFB_DEF_YDIM;
+  rfbDimensionX = BX_RFB_MAX_XDIM;
+  rfbDimensionY = BX_RFB_MAX_YDIM;
   rfbWindowX = rfbDimensionX;
   rfbWindowY = rfbDimensionY + rfbHeaderbarY + rfbStatusbarY;
   rfbTileX      = tilewidth;
@@ -257,7 +256,6 @@ void bx_rfb_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsi
 
   keep_alive = true;
   client_connected = false;
-  desktop_resizable = false;
   StartThread();
 
 #ifdef WIN32
@@ -266,11 +264,6 @@ void bx_rfb_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsi
 #endif
   if (SIM->get_param_bool(BXPN_PRIVATE_COLORMAP)->get()) {
     BX_ERROR(("private_colormap option ignored."));
-  }
-
-  // load keymap for sdl
-  if (SIM->get_param_bool(BXPN_KBD_USEMAPPING)->get()) {
-    bx_keymap.loadKeymap(convertStringToRfbKey);
   }
 
   // parse rfb specific options
@@ -283,9 +276,6 @@ void bx_rfb_gui_c::specific_init(int argc, char **argv, unsigned tilewidth, unsi
       }
     }
   }
-
-  // the ask menu doesn't work on the client side
-  io->set_log_action(LOGLEV_PANIC, ACT_FATAL);
 
   while ((!client_connected) && (timeout--)) {
 #ifdef WIN32
@@ -432,217 +422,214 @@ end_of_thread:
 
 void HandleRfbClient(SOCKET sClient)
 {
-  char rfbName[] = "Bochs-RFB";
-  rfbProtocolVersionMessage pv;
-  int one = 1;
-  U32 auth;
-  rfbClientInitMessage cim;
-  rfbServerInitMessage sim;
+    char rfbName[] = "Bochs-RFB";
+    rfbProtocolVersionMessage pv;
+    int one = 1;
+    U32 auth;
+    rfbClientInitMessage cim;
+    rfbServerInitMessage sim;
 
-  client_connected = true;
-  setsockopt(sClient, IPPROTO_TCP, TCP_NODELAY, (const char *)&one, sizeof(one));
-  BX_INFO(("accepted client connection."));
-  snprintf(pv, rfbProtocolVersionMessageSize,
-           rfbProtocolVersionFormat,
-           rfbServerProtocolMajorVersion,
-           rfbServerProtocolMinorVersion);
+    client_connected = true;
+    setsockopt(sClient, IPPROTO_TCP, TCP_NODELAY, (const char *)&one, sizeof(one));
+    BX_INFO(("accepted client connection."));
+    snprintf(pv , rfbProtocolVersionMessageSize,
+              rfbProtocolVersionFormat,
+              rfbServerProtocolMajorVersion,
+              rfbServerProtocolMinorVersion);
 
-  if(WriteExact(sClient, pv, rfbProtocolVersionMessageSize) < 0) {
-    BX_ERROR(("could not send protocol version."));
-    return;
-  }
-  if(ReadExact(sClient, pv, rfbProtocolVersionMessageSize) < 0) {
-    BX_ERROR(("could not receive client protocol version."));
-    return;
-  }
-  pv[rfbProtocolVersionMessageSize-1]=0; // Drop last character
-  BX_INFO(("Client protocol version is '%s'", pv));
-  // FIXME should check for version number
+    if(WriteExact(sClient, pv, rfbProtocolVersionMessageSize) < 0) {
+        BX_ERROR(("could not send protocol version."));
+        return;
+    }
+    if(ReadExact(sClient, pv, rfbProtocolVersionMessageSize) < 0) {
+        BX_ERROR(("could not receive client protocol version."));
+        return;
+    }
+    pv[rfbProtocolVersionMessageSize-1]=0; // Drop last character
+    BX_INFO(("Client protocol version is '%s'", pv));
+    // FIXME should check for version number
 
-  auth = htonl(rfbSecurityNone);
+    auth = htonl(rfbSecurityNone);
 
-  if(WriteExact(sClient, (char *)&auth, sizeof(auth)) < 0) {
-    BX_ERROR(("could not send authorization method."));
-    return;
-  }
-
-  if(ReadExact(sClient, (char *)&cim, rfbClientInitMessageSize) < 0) {
-    BX_ERROR(("could not receive client initialization message."));
-    return;
-  }
-
-  sim.framebufferWidth  = htons((short)rfbWindowX);
-  sim.framebufferHeight = htons((short)rfbWindowY);
-  sim.serverPixelFormat            = BGR233Format;
-  sim.serverPixelFormat.redMax     = htons(sim.serverPixelFormat.redMax);
-  sim.serverPixelFormat.greenMax   = htons(sim.serverPixelFormat.greenMax);
-  sim.serverPixelFormat.blueMax    = htons(sim.serverPixelFormat.blueMax);
-  sim.nameLength = strlen(rfbName);
-  sim.nameLength = htonl(sim.nameLength);
-  if(WriteExact(sClient, (char *)&sim, rfbServerInitMessageSize) < 0) {
-    BX_ERROR(("could send server initialization message."));
-    return;
-  }
-  if(WriteExact(sClient, rfbName, strlen(rfbName)) < 0) {
-    BX_ERROR (("could not send server name."));
-    return;
-  }
-
-  sGlobal = sClient;
-  while(keep_alive) {
-    U8 msgType;
-    int n;
-
-    if((n = recv(sClient, (char *)&msgType, 1, MSG_PEEK)) <= 0) {
-      if(n == 0) {
-        BX_ERROR(("client closed connection."));
-      } else {
-        BX_ERROR(("error receiving data."));
-      }
-      return;
+    if(WriteExact(sClient, (char *)&auth, sizeof(auth)) < 0) {
+        BX_ERROR(("could not send authorization method."));
+        return;
     }
 
-    switch(msgType) {
-      case rfbSetPixelFormat:
-        {
-          rfbSetPixelFormatMessage spf;
-          ReadExact(sClient, (char *)&spf, sizeof(rfbSetPixelFormatMessage));
+    if(ReadExact(sClient, (char *)&cim, rfbClientInitMessageSize) < 0) {
+        BX_ERROR(("could not receive client initialization message."));
+        return;
+    }
 
-          spf.pixelFormat.bitsPerPixel = spf.pixelFormat.bitsPerPixel;
-          spf.pixelFormat.depth = spf.pixelFormat.depth;
-          spf.pixelFormat.trueColourFlag = (spf.pixelFormat.trueColourFlag ? 1 : 0);
-          spf.pixelFormat.bigEndianFlag = (spf.pixelFormat.bigEndianFlag ? 1 : 0);
-          spf.pixelFormat.redMax = ntohs(spf.pixelFormat.redMax);
-          spf.pixelFormat.greenMax = ntohs(spf.pixelFormat.greenMax);
-          spf.pixelFormat.blueMax = ntohs(spf.pixelFormat.blueMax);
-          spf.pixelFormat.redShift = spf.pixelFormat.redShift;
-          spf.pixelFormat.greenShift = spf.pixelFormat.greenShift;
-          spf.pixelFormat.blueShift = spf.pixelFormat.blueShift;
+    sim.framebufferWidth  = htons((short)rfbWindowX);
+    sim.framebufferHeight = htons((short)rfbWindowY);
+    sim.serverPixelFormat            = BGR233Format;
+    sim.serverPixelFormat.redMax     = htons(sim.serverPixelFormat.redMax);
+    sim.serverPixelFormat.greenMax   = htons(sim.serverPixelFormat.greenMax);
+    sim.serverPixelFormat.blueMax    = htons(sim.serverPixelFormat.blueMax);
+    sim.nameLength = strlen(rfbName);
+    sim.nameLength = htonl(sim.nameLength);
+    if(WriteExact(sClient, (char *)&sim, rfbServerInitMessageSize) < 0) {
+        BX_ERROR(("could send server initialization message."));
+        return;
+    }
+    if(WriteExact(sClient, rfbName, strlen(rfbName)) < 0) {
+        BX_ERROR (("could not send server name."));
+        return;
+    }
 
-          if (!PF_EQ(spf.pixelFormat, BGR233Format)) {
-            BX_ERROR(("client has wrong pixel format (%d %d %d %d %d %d %d %d %d)",
-                      spf.pixelFormat.bitsPerPixel,spf.pixelFormat.depth,spf.pixelFormat.trueColourFlag,
-                      spf.pixelFormat.bigEndianFlag,spf.pixelFormat.redMax,spf.pixelFormat.greenMax,
-                      spf.pixelFormat.blueMax,spf.pixelFormat.redShift,spf.pixelFormat.blueShift));
-            //return;
-          }
-          break;
-        }
-      case rfbFixColourMapEntries:
-        {
-          rfbFixColourMapEntriesMessage fcme;
-          ReadExact(sClient, (char *)&fcme, sizeof(rfbFixColourMapEntriesMessage));
-          break;
-        }
-      case rfbSetEncodings:
-        {
-          rfbSetEncodingsMessage se;
-          Bit32u                 i;
-          U32                    enc;
+    sGlobal = sClient;
+    while(keep_alive) {
+        U8 msgType;
+        int n;
 
-          // free previously registered encodings
-          if (clientEncodings != NULL) {
-            delete [] clientEncodings;
-            clientEncodingsCount = 0;
-          }
-
-          ReadExact(sClient, (char *)&se, sizeof(rfbSetEncodingsMessage));
-
-          // Alloc new clientEncodings
-          clientEncodingsCount = ntohs(se.numberOfEncodings);
-          clientEncodings = new Bit32u[clientEncodingsCount];
-
-          for(i = 0; i < clientEncodingsCount; i++) {
-            if((n = ReadExact(sClient, (char *)&enc, sizeof(U32))) <= 0) {
-              if(n == 0) {
-                BX_ERROR(("client closed connection."));
-              } else {
+        if((n = recv(sClient, (char *)&msgType, 1, MSG_PEEK)) <= 0) {
+            if(n == 0) {
+                        BX_ERROR(("client closed connection."));
+            } else {
                 BX_ERROR(("error receiving data."));
-              }
-              return;
             }
-            clientEncodings[i]=ntohl(enc);
-          }
+            return;
+        }
 
-          // print supported encodings
-          BX_INFO(("rfbSetEncodings : client supported encodings:"));
-          for (i = 0; i < clientEncodingsCount; i++) {
-            Bit32u j;
-            bx_bool found = 0;
-            for (j=0; j < rfbEncodingsCount; j ++) {
-              if (clientEncodings[i] == rfbEncodings[j].id) {
-                BX_INFO(("%08x %s", rfbEncodings[j].id, rfbEncodings[j].name));
-                found=1;
-                if (clientEncodings[i] == rfbEncodingDesktopSize) {
-                  desktop_resizable = true;
+        switch(msgType) {
+        case rfbSetPixelFormat:
+            {
+                rfbSetPixelFormatMessage spf;
+                ReadExact(sClient, (char *)&spf, sizeof(rfbSetPixelFormatMessage));
+
+                spf.pixelFormat.bitsPerPixel = spf.pixelFormat.bitsPerPixel;
+                spf.pixelFormat.depth = spf.pixelFormat.depth;
+                spf.pixelFormat.trueColourFlag = (spf.pixelFormat.trueColourFlag ? 1 : 0);
+                spf.pixelFormat.bigEndianFlag = (spf.pixelFormat.bigEndianFlag ? 1 : 0);
+                spf.pixelFormat.redMax = ntohs(spf.pixelFormat.redMax);
+                spf.pixelFormat.greenMax = ntohs(spf.pixelFormat.greenMax);
+                spf.pixelFormat.blueMax = ntohs(spf.pixelFormat.blueMax);
+                spf.pixelFormat.redShift = spf.pixelFormat.redShift;
+                spf.pixelFormat.greenShift = spf.pixelFormat.greenShift;
+                spf.pixelFormat.blueShift = spf.pixelFormat.blueShift;
+
+                if (!PF_EQ(spf.pixelFormat, BGR233Format)) {
+                    BX_ERROR(("client has wrong pixel format (%d %d %d %d %d %d %d %d %d)",
+			      spf.pixelFormat.bitsPerPixel,spf.pixelFormat.depth,spf.pixelFormat.trueColourFlag,
+			      spf.pixelFormat.bigEndianFlag,spf.pixelFormat.redMax,spf.pixelFormat.greenMax,
+			      spf.pixelFormat.blueMax,spf.pixelFormat.redShift,spf.pixelFormat.blueShift));
+                    //return;
                 }
                 break;
-              }
             }
-            if (!found) BX_INFO(("%08x Unknown", clientEncodings[i]));
-          }
-          break;
-        }
-      case rfbFramebufferUpdateRequest:
-        {
-          rfbFramebufferUpdateRequestMessage fur;
+        case rfbFixColourMapEntries:
+            {
+                rfbFixColourMapEntriesMessage fcme;
+                ReadExact(sClient, (char *)&fcme, sizeof(rfbFixColourMapEntriesMessage));
+                break;
+            }
+        case rfbSetEncodings:
+            {
+                rfbSetEncodingsMessage se;
+                Bit32u                 i;
+                U32                    enc;
 
-          ReadExact(sClient, (char *)&fur, sizeof(rfbFramebufferUpdateRequestMessage));
-          if(!fur.incremental) {
-            rfbUpdateRegion.x = 0;
-            rfbUpdateRegion.y = 0;
-            rfbUpdateRegion.width  = rfbWindowX;
-            rfbUpdateRegion.height = rfbWindowY;
-            rfbUpdateRegion.updated = true;
-          } //else {
-          //    if(fur.x < rfbUpdateRegion.x) rfbUpdateRegion.x = fur.x;
-          //    if(fur.y < rfbUpdateRegion.x) rfbUpdateRegion.y = fur.y;
-          //    if(((fur.x + fur.w) - rfbUpdateRegion.x) > rfbUpdateRegion.width) rfbUpdateRegion.width = ((fur.x + fur.w) - rfbUpdateRegion.x);
-          //    if(((fur.y + fur.h) - rfbUpdateRegion.y) > rfbUpdateRegion.height) rfbUpdateRegion.height = ((fur.y + fur.h) - rfbUpdateRegion.y);
-          //}
-          //rfbUpdateRegion.updated = true;
-          break;
-        }
-      case rfbKeyEvent:
-        {
-          rfbKeyEventMessage ke;
-          ReadExact(sClient, (char *)&ke, sizeof(rfbKeyEventMessage));
-          ke.key = ntohl(ke.key);
-          while(bKeyboardInUse);
-          bKeyboardInUse = true;
-          if (rfbKeyboardEvents >= MAX_KEY_EVENTS) break;
-          rfbKeyboardEvent[rfbKeyboardEvents].type = KEYBOARD;
-          rfbKeyboardEvent[rfbKeyboardEvents].key  = ke.key;
-          rfbKeyboardEvent[rfbKeyboardEvents].down = ke.downFlag;
-          rfbKeyboardEvents++;
-          bKeyboardInUse = false;
-          break;
-        }
-      case rfbPointerEvent:
-        {
-          rfbPointerEventMessage pe;
-          ReadExact(sClient, (char *)&pe, sizeof(rfbPointerEventMessage));
-          while(bKeyboardInUse);
-          bKeyboardInUse = true;
-          if (rfbKeyboardEvents >= MAX_KEY_EVENTS) break;
-          rfbKeyboardEvent[rfbKeyboardEvents].type = MOUSE;
-          rfbKeyboardEvent[rfbKeyboardEvents].x    = ntohs(pe.xPosition);
-          rfbKeyboardEvent[rfbKeyboardEvents].y    = ntohs(pe.yPosition);
-          rfbKeyboardEvent[rfbKeyboardEvents].down = (pe.buttonMask & 0x01) |
-                                                     ((pe.buttonMask>>1) & 0x02) |
-                                                     ((pe.buttonMask<<1) & 0x04);
-          rfbKeyboardEvents++;
-          bKeyboardInUse = false;
-          break;
-        }
-      case rfbClientCutText:
-        {
-          rfbClientCutTextMessage cct;
-          ReadExact(sClient, (char *)&cct, sizeof(rfbClientCutTextMessage));
-          break;
+                // free previously registered encodings
+                if (clientEncodings != NULL) {
+                    delete [] clientEncodings;
+                    clientEncodingsCount = 0;
+                }
+
+                ReadExact(sClient, (char *)&se, sizeof(rfbSetEncodingsMessage));
+
+                // Alloc new clientEncodings
+                clientEncodingsCount = ntohs(se.numberOfEncodings);
+                clientEncodings = new Bit32u[clientEncodingsCount];
+
+                for(i = 0; i < clientEncodingsCount; i++) {
+                    if((n = ReadExact(sClient, (char *)&enc, sizeof(U32))) <= 0) {
+                        if(n == 0) {
+                            BX_ERROR(("client closed connection."));
+                        } else {
+                            BX_ERROR(("error receiving data."));
+                        }
+                        return;
+                    }
+                    clientEncodings[i]=ntohl(enc);
+                }
+
+                // print supported encodings
+                BX_INFO(("rfbSetEncodings : client supported encodings:"));
+                for(i = 0; i < clientEncodingsCount; i++) {
+                    Bit32u j;
+                    bx_bool found = 0;
+                    for (j=0; j < rfbEncodingsCount; j ++) {
+                        if (clientEncodings[i] == rfbEncodings[j].id) {
+                             BX_INFO(("%08x %s", rfbEncodings[j].id, rfbEncodings[j].name));
+                             found=1;
+                             break;
+                             }
+                        }
+                    if (!found) BX_INFO(("%08x Unknown", clientEncodings[i]));
+                    }
+                break;
+            }
+        case rfbFramebufferUpdateRequest:
+            {
+                rfbFramebufferUpdateRequestMessage fur;
+
+                ReadExact(sClient, (char *)&fur, sizeof(rfbFramebufferUpdateRequestMessage));
+                if(!fur.incremental) {
+                    rfbUpdateRegion.x = 0;
+                    rfbUpdateRegion.y = 0;
+                    rfbUpdateRegion.width  = rfbWindowX;
+                    rfbUpdateRegion.height = rfbWindowY;
+                    rfbUpdateRegion.updated = true;
+                } //else {
+                //    if(fur.x < rfbUpdateRegion.x) rfbUpdateRegion.x = fur.x;
+                //    if(fur.y < rfbUpdateRegion.x) rfbUpdateRegion.y = fur.y;
+                //    if(((fur.x + fur.w) - rfbUpdateRegion.x) > rfbUpdateRegion.width) rfbUpdateRegion.width = ((fur.x + fur.w) - rfbUpdateRegion.x);
+                //    if(((fur.y + fur.h) - rfbUpdateRegion.y) > rfbUpdateRegion.height) rfbUpdateRegion.height = ((fur.y + fur.h) - rfbUpdateRegion.y);
+                //}
+                //rfbUpdateRegion.updated = true;
+                break;
+            }
+        case rfbKeyEvent:
+            {
+                rfbKeyEventMessage ke;
+                ReadExact(sClient, (char *)&ke, sizeof(rfbKeyEventMessage));
+                ke.key = ntohl(ke.key);
+                while(bKeyboardInUse);
+                bKeyboardInUse = true;
+                if (rfbKeyboardEvents >= MAX_KEY_EVENTS) break;
+                rfbKeyboardEvent[rfbKeyboardEvents].type = KEYBOARD;
+                rfbKeyboardEvent[rfbKeyboardEvents].key  = ke.key;
+                rfbKeyboardEvent[rfbKeyboardEvents].down = ke.downFlag;
+                rfbKeyboardEvents++;
+                bKeyboardInUse = false;
+                break;
+            }
+        case rfbPointerEvent:
+            {
+                rfbPointerEventMessage pe;
+                ReadExact(sClient, (char *)&pe, sizeof(rfbPointerEventMessage));
+                while(bKeyboardInUse);
+                bKeyboardInUse = true;
+                if (rfbKeyboardEvents >= MAX_KEY_EVENTS) break;
+                rfbKeyboardEvent[rfbKeyboardEvents].type = MOUSE;
+                rfbKeyboardEvent[rfbKeyboardEvents].x    = ntohs(pe.xPosition);
+                rfbKeyboardEvent[rfbKeyboardEvents].y    = ntohs(pe.yPosition);
+                rfbKeyboardEvent[rfbKeyboardEvents].down = (pe.buttonMask & 0x01)
+                                                           | ((pe.buttonMask>>1) & 0x02)
+                                                           | ((pe.buttonMask<<1) & 0x04);
+                rfbKeyboardEvents++;
+                bKeyboardInUse = false;
+                break;
+            }
+        case rfbClientCutText:
+            {
+                rfbClientCutTextMessage cct;
+                ReadExact(sClient, (char *)&cct, sizeof(rfbClientCutTextMessage));
+                break;
+            }
         }
     }
-  }
 }
 // ::HANDLE_EVENTS()
 //
@@ -668,8 +655,7 @@ void bx_rfb_gui_c::handle_events(void)
     bKeyboardInUse = false;
 
     if(rfbUpdateRegion.updated) {
-        SendUpdate(rfbUpdateRegion.x, rfbUpdateRegion.y, rfbUpdateRegion.width,
-                   rfbUpdateRegion.height, rfbEncodingRaw);
+        SendUpdate(rfbUpdateRegion.x, rfbUpdateRegion.y, rfbUpdateRegion.width, rfbUpdateRegion.height);
         rfbUpdateRegion.x = rfbWindowX;
         rfbUpdateRegion.y = rfbWindowY;
         rfbUpdateRegion.width  = 0;
@@ -833,15 +819,12 @@ bx_bool bx_rfb_gui_c::palette_change(unsigned index, unsigned red, unsigned gree
 //       left of the window.
 void bx_rfb_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0)
 {
-  UpdateScreen(tile, x0, y0 + rfbHeaderbarY, rfbTileX, rfbTileY, false);
-  if(x0 < rfbUpdateRegion.x) rfbUpdateRegion.x = x0;
-  if((y0 + rfbHeaderbarY) < rfbUpdateRegion.y) rfbUpdateRegion.y = y0 + rfbHeaderbarY;
-  if(((y0 + rfbHeaderbarY + rfbTileY) - rfbUpdateRegion.y) > rfbUpdateRegion.height) rfbUpdateRegion.height =  ((y0 + rfbHeaderbarY + rfbTileY) - rfbUpdateRegion.y);
-  if(((x0 + rfbTileX) - rfbUpdateRegion.x) > rfbUpdateRegion.width) rfbUpdateRegion.width = ((x0 + rfbTileX) - rfbUpdateRegion.x);
-  if ((rfbUpdateRegion.x + rfbUpdateRegion.width) > rfbWindowX) {
-    rfbUpdateRegion.width = rfbWindowX - rfbUpdateRegion.x;
-  }
-  rfbUpdateRegion.updated = true;
+    UpdateScreen(tile, x0, y0 + rfbHeaderbarY, rfbTileX, rfbTileY, false);
+    if(x0 < rfbUpdateRegion.x) rfbUpdateRegion.x = x0;
+    if((y0 + rfbHeaderbarY) < rfbUpdateRegion.y) rfbUpdateRegion.y = y0 + rfbHeaderbarY;
+    if(((y0 + rfbHeaderbarY + rfbTileY) - rfbUpdateRegion.y) > rfbUpdateRegion.height) rfbUpdateRegion.height =  ((y0 + rfbHeaderbarY + rfbTileY) - rfbUpdateRegion.y);
+    if(((x0 + rfbTileX) - rfbUpdateRegion.x) > rfbUpdateRegion.width) rfbUpdateRegion.width = ((x0 + rfbTileX) - rfbUpdateRegion.x);
+    rfbUpdateRegion.updated = true;
 }
 
 bx_svga_tileinfo_t *bx_rfb_gui_c::graphics_tile_info(bx_svga_tileinfo_t *info)
@@ -898,9 +881,6 @@ void bx_rfb_gui_c::graphics_tile_update_in_place(unsigned x0, unsigned y0,
   if((y0 + rfbHeaderbarY) < rfbUpdateRegion.y) rfbUpdateRegion.y = y0 + rfbHeaderbarY;
   if(((y0 + rfbHeaderbarY + h) - rfbUpdateRegion.y) > rfbUpdateRegion.height) rfbUpdateRegion.height =  ((y0 + rfbHeaderbarY + h) - rfbUpdateRegion.y);
   if(((x0 + w) - rfbUpdateRegion.x) > rfbUpdateRegion.width) rfbUpdateRegion.width = ((x0 + h) - rfbUpdateRegion.x);
-  if ((rfbUpdateRegion.x + rfbUpdateRegion.width) > rfbWindowX) {
-    rfbUpdateRegion.width = rfbWindowX - rfbUpdateRegion.x;
-  }
   rfbUpdateRegion.updated = true;
 }
 
@@ -931,20 +911,10 @@ void bx_rfb_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight, un
   if ((x > BX_RFB_MAX_XDIM) || (y > BX_RFB_MAX_YDIM)) {
     BX_PANIC(("dimension_update(): RFB doesn't support graphics mode %dx%d", x, y));
   } else if ((x != rfbDimensionX) || (x != rfbDimensionY)) {
-    if (desktop_resizable) {
-      rfbDimensionX = x;
-      rfbDimensionY = y;
-      rfbWindowX = rfbDimensionX;
-      rfbWindowY = rfbDimensionY + rfbHeaderbarY + rfbStatusbarY;
-      rfbScreen = (char *)realloc(rfbScreen, rfbWindowX * rfbWindowY);
-      SendUpdate(0, 0, rfbWindowX, rfbWindowY, rfbEncodingDesktopSize);
-      bx_gui->show_headerbar();
-    } else {
-      clear_screen();
-      SendUpdate(0, rfbHeaderbarY, rfbDimensionX, rfbDimensionY, rfbEncodingRaw);
-      rfbDimensionX = x;
-      rfbDimensionY = y;
-    }
+    clear_screen();
+    SendUpdate(0, rfbHeaderbarY, rfbDimensionX, rfbDimensionY);
+    rfbDimensionX = x;
+    rfbDimensionY = y;
   }
 }
 
@@ -1289,7 +1259,7 @@ void UpdateScreen(unsigned char *newBits, int x, int y, int width, int height, b
     }
 }
 
-void SendUpdate(int x, int y, int width, int height, Bit32u encoding)
+void SendUpdate(int x, int y, int width, int height)
 {
     char *newBits;
     int  i;
@@ -1308,20 +1278,19 @@ void SendUpdate(int x, int y, int width, int height, Bit32u encoding)
         furh.r.yPosition = htons(y);
         furh.r.width = htons((short)width);
         furh.r.height = htons((short)height);
-        furh.r.encodingType = htonl(encoding);
+        furh.r.encodingType = htonl(rfbEncodingRaw);
+
+        newBits = (char *)malloc(width * height);
+        for(i = 0; i < height; i++) {
+            memcpy(&newBits[i * width], &rfbScreen[y * rfbWindowX + x], width);
+            y++;
+        }
 
         WriteExact(sGlobal, (char *)&fum, rfbFramebufferUpdateMessageSize);
         WriteExact(sGlobal, (char *)&furh, rfbFramebufferUpdateRectHeaderSize);
+        WriteExact(sGlobal, (char *)newBits, width * height);
 
-        if (encoding == rfbEncodingRaw) {
-          newBits = (char *)malloc(width * height);
-          for(i = 0; i < height; i++) {
-            memcpy(&newBits[i * width], &rfbScreen[y * rfbWindowX + x], width);
-            y++;
-          }
-          WriteExact(sGlobal, (char *)newBits, width * height);
-          free(newBits);
-        }
+        free(newBits);
     }
 }
 
@@ -1335,19 +1304,129 @@ void StartThread()
 #endif
 }
 
-// function to convert key names into rfb key values.
-// This first try will be horribly inefficient, but it only has
-// to be done while loading a keymap.  Once the simulation starts,
-// this function won't be called.
-static Bit32u convertStringToRfbKey(const char *string)
-{
-  rfbKeyTabEntry *ptr;
-  for (ptr = &rfb_keytable[0]; ptr->name != NULL; ptr++) {
-    if (!strcmp(string, ptr->name))
-      return ptr->value;
-  }
-  return BX_KEYMAP_UNKNOWN;
-}
+/***********************/
+/* Keyboard Definitons */
+/*        And          */
+/*     Functions       */
+/***********************/
+
+#define XK_space            0x020
+#define XK_asciitilde       0x07e
+
+#define XK_dead_grave       0xFE50
+#define XK_dead_acute       0xFE51
+#define XK_dead_circumflex  0xFE52
+#define XK_dead_tilde       0xFE53
+
+#define XK_BackSpace        0xFF08
+#define XK_Tab              0xFF09
+#define XK_Linefeed         0xFF0A
+#define XK_Clear            0xFF0B
+#define XK_Return           0xFF0D
+#define XK_Pause            0xFF13
+#define XK_Scroll_Lock      0xFF14
+#define XK_Sys_Req          0xFF15
+#define XK_Escape           0xFF1B
+
+#define XK_Delete           0xFFFF
+
+#define XK_Home             0xFF50
+#define XK_Left             0xFF51
+#define XK_Up               0xFF52
+#define XK_Right            0xFF53
+#define XK_Down             0xFF54
+#define XK_Page_Up          0xFF55
+#define XK_Page_Down        0xFF56
+#define XK_End              0xFF57
+#define XK_Begin            0xFF58
+
+#define XK_Select           0xFF60
+#define XK_Print            0xFF61
+#define XK_Execute          0xFF62
+#define XK_Insert           0xFF63
+
+#define XK_Cancel           0xFF69
+#define XK_Help             0xFF6A
+#define XK_Break            0xFF6B
+#define XK_Num_Lock         0xFF7F
+
+#define XK_KP_Space         0xFF80
+#define XK_KP_Tab           0xFF89
+#define XK_KP_Enter         0xFF8D
+
+#define XK_KP_Home          0xFF95
+#define XK_KP_Left          0xFF96
+#define XK_KP_Up            0xFF97
+#define XK_KP_Right         0xFF98
+#define XK_KP_Down          0xFF99
+#define XK_KP_Prior         0xFF9A
+#define XK_KP_Page_Up       0xFF9A
+#define XK_KP_Next          0xFF9B
+#define XK_KP_Page_Down     0xFF9B
+#define XK_KP_End           0xFF9C
+#define XK_KP_Begin         0xFF9D
+#define XK_KP_Insert        0xFF9E
+#define XK_KP_Delete        0xFF9F
+#define XK_KP_Equal         0xFFBD
+#define XK_KP_Multiply      0xFFAA
+#define XK_KP_Add           0xFFAB
+#define XK_KP_Separator     0xFFAC
+#define XK_KP_Subtract      0xFFAD
+#define XK_KP_Decimal       0xFFAE
+#define XK_KP_Divide        0xFFAF
+
+#define XK_KP_F1            0xFF91
+#define XK_KP_F2            0xFF92
+#define XK_KP_F3            0xFF93
+#define XK_KP_F4            0xFF94
+
+#define XK_KP_0             0xFFB0
+#define XK_KP_1             0xFFB1
+#define XK_KP_2             0xFFB2
+#define XK_KP_3             0xFFB3
+#define XK_KP_4             0xFFB4
+#define XK_KP_5             0xFFB5
+#define XK_KP_6             0xFFB6
+#define XK_KP_7             0xFFB7
+#define XK_KP_8             0xFFB8
+#define XK_KP_9             0xFFB9
+
+#define XK_F1               0xFFBE
+#define XK_F2               0xFFBF
+#define XK_F3               0xFFC0
+#define XK_F4               0xFFC1
+#define XK_F5               0xFFC2
+#define XK_F6               0xFFC3
+#define XK_F7               0xFFC4
+#define XK_F8               0xFFC5
+#define XK_F9               0xFFC6
+#define XK_F10              0xFFC7
+#define XK_F11              0xFFC8
+#define XK_F12              0xFFC9
+#define XK_F13              0xFFCA
+#define XK_F14              0xFFCB
+#define XK_F15              0xFFCC
+#define XK_F16              0xFFCD
+#define XK_F17              0xFFCE
+#define XK_F18              0xFFCF
+#define XK_F19              0xFFD0
+#define XK_F20              0xFFD1
+#define XK_F21              0xFFD2
+#define XK_F22              0xFFD3
+#define XK_F23              0xFFD4
+#define XK_F24              0xFFD5
+
+
+#define XK_Shift_L          0xFFE1
+#define XK_Shift_R          0xFFE2
+#define XK_Control_L        0xFFE3
+#define XK_Control_R        0xFFE4
+#define XK_Caps_Lock        0xFFE5
+#define XK_Shift_Lock       0xFFE6
+#define XK_Meta_L           0xFFE7
+#define XK_Meta_R           0xFFE8
+#define XK_Alt_L            0xFFE9
+#define XK_Alt_R            0xFFEA
 
 Bit32u rfb_ascii_to_key_event[0x5f] = {
   //  !"#$%&'
@@ -1470,159 +1549,152 @@ Bit32u rfb_ascii_to_key_event[0x5f] = {
   BX_KEY_BACKSLASH,
   BX_KEY_RIGHT_BRACKET,
   BX_KEY_GRAVE
-};
+  };
 
 void rfbKeyPressed(Bit32u key, int press_release)
 {
   Bit32u key_event;
 
-  if (!SIM->get_param_bool(BXPN_KBD_USEMAPPING)->get()) {
-    if((key >= XK_space) && (key <= XK_asciitilde)) {
-      key_event = rfb_ascii_to_key_event[key - XK_space];
-    } else {
-      switch (key) {
-        case XK_KP_1:
+  if((key >= XK_space) && (key <= XK_asciitilde)) {
+    key_event = rfb_ascii_to_key_event[key - XK_space];
+  } else {
+    switch (key) {
+      case XK_KP_1:
 #ifdef XK_KP_End
-        case XK_KP_End:
+      case XK_KP_End:
 #endif
-          key_event = BX_KEY_KP_END; break;
+        key_event = BX_KEY_KP_END; break;
 
-        case XK_KP_2:
+      case XK_KP_2:
 #ifdef XK_KP_Down
-        case XK_KP_Down:
+      case XK_KP_Down:
 #endif
-          key_event = BX_KEY_KP_DOWN; break;
+        key_event = BX_KEY_KP_DOWN; break;
 
-        case XK_KP_3:
+      case XK_KP_3:
 #ifdef XK_KP_Page_Down
-        case XK_KP_Page_Down:
+      case XK_KP_Page_Down:
 #endif
-          key_event = BX_KEY_KP_PAGE_DOWN; break;
+        key_event = BX_KEY_KP_PAGE_DOWN; break;
 
-        case XK_KP_4:
+      case XK_KP_4:
 #ifdef XK_KP_Left
-        case XK_KP_Left:
+      case XK_KP_Left:
 #endif
-          key_event = BX_KEY_KP_LEFT; break;
+        key_event = BX_KEY_KP_LEFT; break;
 
-        case XK_KP_5:
+      case XK_KP_5:
 #ifdef XK_KP_Begin
-        case XK_KP_Begin:
+      case XK_KP_Begin:
 #endif
-          key_event = BX_KEY_KP_5; break;
+        key_event = BX_KEY_KP_5; break;
 
-        case XK_KP_6:
+      case XK_KP_6:
 #ifdef XK_KP_Right
-        case XK_KP_Right:
+      case XK_KP_Right:
 #endif
-          key_event = BX_KEY_KP_RIGHT; break;
+        key_event = BX_KEY_KP_RIGHT; break;
 
-        case XK_KP_7:
+      case XK_KP_7:
 #ifdef XK_KP_Home
-        case XK_KP_Home:
+      case XK_KP_Home:
 #endif
-          key_event = BX_KEY_KP_HOME; break;
+        key_event = BX_KEY_KP_HOME; break;
 
-        case XK_KP_8:
+      case XK_KP_8:
 #ifdef XK_KP_Up
-        case XK_KP_Up:
+      case XK_KP_Up:
 #endif
-          key_event = BX_KEY_KP_UP; break;
+        key_event = BX_KEY_KP_UP; break;
 
-        case XK_KP_9:
+      case XK_KP_9:
 #ifdef XK_KP_Page_Up
-        case XK_KP_Page_Up:
+      case XK_KP_Page_Up:
 #endif
-          key_event = BX_KEY_KP_PAGE_UP; break;
+        key_event = BX_KEY_KP_PAGE_UP; break;
 
-        case XK_KP_0:
+      case XK_KP_0:
 #ifdef XK_KP_Insert
-        case XK_KP_Insert:
+      case XK_KP_Insert:
 #endif
-          key_event = BX_KEY_KP_INSERT; break;
+        key_event = BX_KEY_KP_INSERT; break;
 
-        case XK_KP_Decimal:
+      case XK_KP_Decimal:
 #ifdef XK_KP_Delete
-        case XK_KP_Delete:
+      case XK_KP_Delete:
 #endif
-          key_event = BX_KEY_KP_DELETE; break;
+        key_event = BX_KEY_KP_DELETE; break;
 
 #ifdef XK_KP_Enter
-        case XK_KP_Enter:    key_event = BX_KEY_KP_ENTER; break;
+      case XK_KP_Enter:    key_event = BX_KEY_KP_ENTER; break;
 #endif
 
-        case XK_KP_Subtract: key_event = BX_KEY_KP_SUBTRACT; break;
-        case XK_KP_Add:      key_event = BX_KEY_KP_ADD; break;
+      case XK_KP_Subtract: key_event = BX_KEY_KP_SUBTRACT; break;
+      case XK_KP_Add:      key_event = BX_KEY_KP_ADD; break;
 
-        case XK_KP_Multiply: key_event = BX_KEY_KP_MULTIPLY; break;
-        case XK_KP_Divide:   key_event = BX_KEY_KP_DIVIDE; break;
+      case XK_KP_Multiply: key_event = BX_KEY_KP_MULTIPLY; break;
+      case XK_KP_Divide:   key_event = BX_KEY_KP_DIVIDE; break;
 
 
-        case XK_Up:          key_event = BX_KEY_UP; break;
-        case XK_Down:        key_event = BX_KEY_DOWN; break;
-        case XK_Left:        key_event = BX_KEY_LEFT; break;
-        case XK_Right:       key_event = BX_KEY_RIGHT; break;
+      case XK_Up:          key_event = BX_KEY_UP; break;
+      case XK_Down:        key_event = BX_KEY_DOWN; break;
+      case XK_Left:        key_event = BX_KEY_LEFT; break;
+      case XK_Right:       key_event = BX_KEY_RIGHT; break;
 
-        case XK_Delete:      key_event = BX_KEY_DELETE; break;
-        case XK_BackSpace:   key_event = BX_KEY_BACKSPACE; break;
-        case XK_Tab:         key_event = BX_KEY_TAB; break;
+
+      case XK_Delete:      key_event = BX_KEY_DELETE; break;
+      case XK_BackSpace:   key_event = BX_KEY_BACKSPACE; break;
+      case XK_Tab:         key_event = BX_KEY_TAB; break;
 #ifdef XK_ISO_Left_Tab
-        case XK_ISO_Left_Tab: key_event = BX_KEY_TAB; break;
+      case XK_ISO_Left_Tab: key_event = BX_KEY_TAB; break;
 #endif
-        case XK_Return:      key_event = BX_KEY_ENTER; break;
-        case XK_Escape:      key_event = BX_KEY_ESC; break;
-        case XK_F1:          key_event = BX_KEY_F1; break;
-        case XK_F2:          key_event = BX_KEY_F2; break;
-        case XK_F3:          key_event = BX_KEY_F3; break;
-        case XK_F4:          key_event = BX_KEY_F4; break;
-        case XK_F5:          key_event = BX_KEY_F5; break;
-        case XK_F6:          key_event = BX_KEY_F6; break;
-        case XK_F7:          key_event = BX_KEY_F7; break;
-        case XK_F8:          key_event = BX_KEY_F8; break;
-        case XK_F9:          key_event = BX_KEY_F9; break;
-        case XK_F10:         key_event = BX_KEY_F10; break;
-        case XK_F11:         key_event = BX_KEY_F11; break;
-        case XK_F12:         key_event = BX_KEY_F12; break;
-        case XK_Control_L:   key_event = BX_KEY_CTRL_L; break;
+      case XK_Return:      key_event = BX_KEY_ENTER; break;
+      case XK_Escape:      key_event = BX_KEY_ESC; break;
+      case XK_F1:          key_event = BX_KEY_F1; break;
+      case XK_F2:          key_event = BX_KEY_F2; break;
+      case XK_F3:          key_event = BX_KEY_F3; break;
+      case XK_F4:          key_event = BX_KEY_F4; break;
+      case XK_F5:          key_event = BX_KEY_F5; break;
+      case XK_F6:          key_event = BX_KEY_F6; break;
+      case XK_F7:          key_event = BX_KEY_F7; break;
+      case XK_F8:          key_event = BX_KEY_F8; break;
+      case XK_F9:          key_event = BX_KEY_F9; break;
+      case XK_F10:         key_event = BX_KEY_F10; break;
+      case XK_F11:         key_event = BX_KEY_F11; break;
+      case XK_F12:         key_event = BX_KEY_F12; break;
+      case XK_Control_L:   key_event = BX_KEY_CTRL_L; break;
 #ifdef XK_Control_R
-        case XK_Control_R:   key_event = BX_KEY_CTRL_R; break;
+      case XK_Control_R:   key_event = BX_KEY_CTRL_R; break;
 #endif
-        case XK_Shift_L:     key_event = BX_KEY_SHIFT_L; break;
-        case XK_Shift_R:     key_event = BX_KEY_SHIFT_R; break;
-        case XK_Alt_L:       key_event = BX_KEY_ALT_L; break;
+      case XK_Shift_L:     key_event = BX_KEY_SHIFT_L; break;
+      case XK_Shift_R:     key_event = BX_KEY_SHIFT_R; break;
+      case XK_Alt_L:       key_event = BX_KEY_ALT_L; break;
 #ifdef XK_Alt_R
-        case XK_Alt_R:       key_event = BX_KEY_ALT_R; break;
+      case XK_Alt_R:       key_event = BX_KEY_ALT_R; break;
 #endif
-        case XK_Caps_Lock:   key_event = BX_KEY_CAPS_LOCK; break;
-        case XK_Num_Lock:    key_event = BX_KEY_NUM_LOCK; break;
+      case XK_Caps_Lock:   key_event = BX_KEY_CAPS_LOCK; break;
+      case XK_Num_Lock:    key_event = BX_KEY_NUM_LOCK; break;
 #ifdef XK_Scroll_Lock
-        case XK_Scroll_Lock: key_event = BX_KEY_SCRL_LOCK; break;
+      case XK_Scroll_Lock: key_event = BX_KEY_SCRL_LOCK; break;
 #endif
 #ifdef XK_Print
-        case XK_Print:       key_event = BX_KEY_PRINT; break;
+      case XK_Print:       key_event = BX_KEY_PRINT; break;
 #endif
 #ifdef XK_Pause
-        case XK_Pause:       key_event = BX_KEY_PAUSE; break;
+      case XK_Pause:       key_event = BX_KEY_PAUSE; break;
 #endif
 
-        case XK_Insert:      key_event = BX_KEY_INSERT; break;
-        case XK_Home:        key_event = BX_KEY_HOME; break;
-        case XK_End:         key_event = BX_KEY_END; break;
-        case XK_Page_Up:     key_event = BX_KEY_PAGE_UP; break;
-        case XK_Page_Down:   key_event = BX_KEY_PAGE_DOWN; break;
+      case XK_Insert:      key_event = BX_KEY_INSERT; break;
+      case XK_Home:        key_event = BX_KEY_HOME; break;
+      case XK_End:         key_event = BX_KEY_END; break;
+      case XK_Page_Up:     key_event = BX_KEY_PAGE_UP; break;
+      case XK_Page_Down:   key_event = BX_KEY_PAGE_DOWN; break;
 
-        default:
-          BX_ERROR(("rfbKeyPress(): key %04x unhandled!", key));
-          return;
-      }
+      default:
+        BX_ERROR(("rfbKeyPress(): key %04x unhandled!", key));
+        return;
+        break;
     }
-  } else {
-    BXKeyEntry *entry = bx_keymap.findHostKey(key);
-    if (!entry) {
-      BX_ERROR(("rfbKeyPressed(): key %x unhandled!", (unsigned) key));
-      return;
-    }
-    key_event = entry->baseKey;
   }
 
   if (!press_release) key_event |= BX_KEY_RELEASED;
@@ -1666,13 +1738,8 @@ void bx_rfb_gui_c::mouse_enabled_changed_specific (bx_bool val)
 
 void bx_rfb_gui_c::get_capabilities(Bit16u *xres, Bit16u *yres, Bit16u *bpp)
 {
-  if (desktop_resizable) {
-    *xres = BX_RFB_MAX_XDIM;
-    *yres = BX_RFB_MAX_YDIM;
-  } else {
-    *xres = BX_RFB_DEF_XDIM;
-    *yres = BX_RFB_DEF_YDIM;
-  }
+  *xres = BX_RFB_MAX_XDIM;
+  *yres = BX_RFB_MAX_YDIM;
   *bpp = 8;
 }
 
