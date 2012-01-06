@@ -33,14 +33,10 @@ bx_pic_c *thePic = NULL;
 
 int libpic_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, char *argv[])
 {
-  if (type == PLUGTYPE_CORE) {
-    thePic = new bx_pic_c();
-    bx_devices.pluginPicDevice = thePic;
-    BX_REGISTER_DEVICE_DEVMODEL(plugin, type, thePic, BX_PLUGIN_PIC);
-    return 0; // Success
-  } else {
-    return -1;
-  }
+  thePic = new bx_pic_c();
+  bx_devices.pluginPicDevice = thePic;
+  BX_REGISTER_DEVICE_DEVMODEL(plugin, type, thePic, BX_PLUGIN_PIC);
+  return(0); // Success
 }
 
 void libpic_LTX_plugin_fini(void)

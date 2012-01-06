@@ -106,6 +106,11 @@ void bx_devices_c::init(BX_MEM_C *newmem)
   unsigned i;
   const char def_name[] = "Default";
   const char *vga_ext;
+  bx_list_c *plugin_ctrl;
+  bx_param_bool_c *plugin;
+#if !BX_PLUGINS
+  const char *plugname;
+#endif
 
   BX_DEBUG(("Init $Id$"));
   mem = newmem;
@@ -189,6 +194,42 @@ void bx_devices_c::init(BX_MEM_C *newmem)
 #endif
   }
 
+  // optional plugins not controlled by separate option
+  plugin_ctrl = (bx_list_c*)SIM->get_param(BXPN_PLUGIN_CTRL);
+  for (i = 0; i < (unsigned)plugin_ctrl->get_size(); i++) {
+    plugin = (bx_param_bool_c*)(plugin_ctrl->get(i));
+    if (plugin->get()) {
+#if BX_PLUGINS
+      PLUG_load_opt_plugin(plugin->get_name());
+#else
+      // workaround in case of plugins disabled
+      plugname = plugin->get_name();
+      if (!strcmp(plugname, BX_PLUGIN_UNMAPPED)) {
+        PLUG_load_plugin(unmapped, PLUGTYPE_OPTIONAL);
+      }
+      else if (!strcmp(plugname, BX_PLUGIN_BIOSDEV)) {
+        PLUG_load_plugin(biosdev, PLUGTYPE_OPTIONAL);
+      }
+      else if (!strcmp(plugname, BX_PLUGIN_SPEAKER)) {
+        PLUG_load_plugin(speaker, PLUGTYPE_OPTIONAL);
+      }
+      else if (!strcmp(plugname, BX_PLUGIN_EXTFPUIRQ)) {
+        PLUG_load_plugin(extfpuirq, PLUGTYPE_OPTIONAL);
+      }
+#if BX_SUPPORT_GAMEPORT
+      else if (!strcmp(plugname, BX_PLUGIN_GAMEPORT)) {
+        PLUG_load_plugin(gameport, PLUGTYPE_OPTIONAL);
+      }
+#endif
+#if BX_SUPPORT_IODEBUG
+      else if (!strcmp(plugname, BX_PLUGIN_IODEBUG)) {
+        PLUG_load_plugin(iodebug, PLUGTYPE_OPTIONAL);
+      }
+#endif
+#endif
+    }
+  }
+
 #if BX_SUPPORT_APIC
   PLUG_load_plugin(ioapic, PLUGTYPE_OPTIONAL);
 #endif
@@ -261,6 +302,13 @@ void bx_devices_c::init(BX_MEM_C *newmem)
     PLUG_load_plugin(sb16, PLUGTYPE_OPTIONAL);
 #else
     BX_ERROR(("Bochs is not compiled with SB16 support"));
+#endif
+  }
+  if (SIM->get_param_bool(BXPN_ES1370_ENABLED)->get()) {
+#if BX_SUPPORT_ES1370
+    PLUG_load_plugin(es1370, PLUGTYPE_OPTIONAL);
+#else
+    BX_ERROR(("Bochs is not compiled with ES1370 support"));
 #endif
   }
 

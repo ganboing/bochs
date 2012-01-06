@@ -366,10 +366,11 @@ void BX_CPU_C::register_state(void)
   BXRS_DEC_PARAM_SIMPLE(cpu, cpu_mode);
   BXRS_HEX_PARAM_SIMPLE(cpu, activity_state);
   BXRS_HEX_PARAM_SIMPLE(cpu, inhibit_mask);
-  BXRS_HEX_PARAM_SIMPLE(cpu, inhibit_icount);
   BXRS_HEX_PARAM_SIMPLE(cpu, debug_trap);
+#if BX_DEBUGGER || BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS
   BXRS_DEC_PARAM_SIMPLE(cpu, icount);
   BXRS_DEC_PARAM_SIMPLE(cpu, icount_last_sync);
+#endif
 #if BX_SUPPORT_X86_64
   BXRS_HEX_PARAM_SIMPLE(cpu, RAX);
   BXRS_HEX_PARAM_SIMPLE(cpu, RBX);
@@ -420,12 +421,7 @@ void BX_CPU_C::register_state(void)
     BXRS_HEX_PARAM_FIELD(cpu, XCR0, xcr0.val32);
   }
 #endif
-#if BX_CPU_LEVEL >= 5
-  BXRS_HEX_PARAM_FIELD(cpu, tsc_last_reset, tsc_last_reset);
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  BXRS_HEX_PARAM_FIELD(cpu, tsc_offset, tsc_offset);
-#endif
-#endif
+
   for(n=0; n<6; n++) {
     bx_segment_reg_t *segment = &BX_CPU_THIS_PTR sregs[n];
     bx_list_c *sreg = new bx_list_c(cpu, strseg(segment), 12);
@@ -508,6 +504,7 @@ void BX_CPU_C::register_state(void)
     BXRS_HEX_PARAM_FIELD(MSR, tsc_aux, msr.tsc_aux);
   }
 #endif
+  BXRS_HEX_PARAM_FIELD(MSR, tsc_last_reset, msr.tsc_last_reset);
 #if BX_CPU_LEVEL >= 6
   BXRS_HEX_PARAM_FIELD(MSR, sysenter_cs_msr,  msr.sysenter_cs_msr);
   BXRS_HEX_PARAM_FIELD(MSR, sysenter_esp_msr, msr.sysenter_esp_msr);
@@ -609,10 +606,6 @@ void BX_CPU_C::register_state(void)
 
 #if BX_SUPPORT_VMX
   register_vmx_state(cpu);
-#endif
-
-#if BX_SUPPORT_SVM
-  register_svm_state(cpu);
 #endif
 
   BXRS_HEX_PARAM_SIMPLE32(cpu, async_event);
@@ -790,13 +783,13 @@ void BX_CPU_C::reset(unsigned source)
   // status and control flags register set
   setEFlags(0x2); // Bit1 is always set
 
+#if BX_DEBUGGER || BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
   if (source == BX_RESET_HARDWARE)
     BX_CPU_THIS_PTR icount = 0;
   BX_CPU_THIS_PTR icount_last_sync = BX_CPU_THIS_PTR icount;
+#endif
 
   BX_CPU_THIS_PTR inhibit_mask = 0;
-  BX_CPU_THIS_PTR inhibit_icount = 0;
-
   BX_CPU_THIS_PTR activity_state = BX_ACTIVITY_STATE_ACTIVE;
   BX_CPU_THIS_PTR debug_trap = 0;
 
@@ -988,8 +981,6 @@ void BX_CPU_C::reset(unsigned source)
     BX_CPU_THIS_PTR efer_suppmask |= (BX_EFER_SCE_MASK | BX_EFER_LME_MASK | BX_EFER_LMA_MASK);
     if (BX_CPUID_SUPPORT_CPU_EXTENSION(BX_CPU_FFXSR))
       BX_CPU_THIS_PTR efer_suppmask |= BX_EFER_FFXSR_MASK;
-    if (BX_CPUID_SUPPORT_ISA_EXTENSION(BX_ISA_SVM))
-      BX_CPU_THIS_PTR efer_suppmask |= BX_EFER_SVME_MASK;
   }
 #endif
 
@@ -1004,9 +995,6 @@ void BX_CPU_C::reset(unsigned source)
   }
 #endif
 
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  BX_CPU_THIS_PTR tsc_offset = 0;
-#endif
   if (source == BX_RESET_HARDWARE) {
     BX_CPU_THIS_PTR set_TSC(0); // do not change TSC on INIT
   }
@@ -1100,6 +1088,7 @@ void BX_CPU_C::reset(unsigned source)
 #if BX_SUPPORT_VMX
   BX_CPU_THIS_PTR in_vmx = BX_CPU_THIS_PTR in_vmx_guest = 0;
   BX_CPU_THIS_PTR in_smm_vmx = BX_CPU_THIS_PTR in_smm_vmx_guest = 0;
+  BX_CPU_THIS_PTR in_event = 0;
   BX_CPU_THIS_PTR vmx_interrupt_window = 0;
 #if BX_SUPPORT_VMX >= 2  
   BX_CPU_THIS_PTR pending_vmx_timer_expired = 0;
@@ -1109,17 +1098,6 @@ void BX_CPU_C::reset(unsigned source)
   /* enable VMX, should be done in BIOS instead */
   BX_CPU_THIS_PTR msr.ia32_feature_ctrl =
     /*BX_IA32_FEATURE_CONTROL_LOCK_BIT | */BX_IA32_FEATURE_CONTROL_VMX_ENABLE_BIT;
-#endif
-
-#if BX_SUPPORT_SVM
-  BX_CPU_THIS_PTR in_svm_guest = 0;
-  BX_CPU_THIS_PTR svm_gif = 1;
-  BX_CPU_THIS_PTR vmcbptr = 0;
-  BX_CPU_THIS_PTR vmcbhostptr = 0;
-#endif
-
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  BX_CPU_THIS_PTR in_event = 0;
 #endif
 
 #if BX_SUPPORT_SMP

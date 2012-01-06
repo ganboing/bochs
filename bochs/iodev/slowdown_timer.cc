@@ -50,7 +50,7 @@ bx_slowdown_timer_c bx_slowdown_timer;
 
 bx_slowdown_timer_c::bx_slowdown_timer_c()
 {
-  put("slowdown_timer", "STIME");
+  put("STIME");
 
   s.start_time=0;
   s.start_emulated_time=0;

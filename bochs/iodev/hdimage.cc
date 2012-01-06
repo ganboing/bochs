@@ -45,13 +45,9 @@ bx_hdimage_ctl_c* theHDImageCtl = NULL;
 
 int libhdimage_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, char *argv[])
 {
-  if (type == PLUGTYPE_CORE) {
-    theHDImageCtl = new bx_hdimage_ctl_c;
-    bx_devices.pluginHDImageCtl = theHDImageCtl;
-    return 0; // Success
-  } else {
-    return -1;
-  }
+  theHDImageCtl = new bx_hdimage_ctl_c;
+  bx_devices.pluginHDImageCtl = theHDImageCtl;
+  return(0); // Success
 }
 
 void libhdimage_LTX_plugin_fini(void)
@@ -61,7 +57,7 @@ void libhdimage_LTX_plugin_fini(void)
 
 bx_hdimage_ctl_c::bx_hdimage_ctl_c()
 {
-  put("hdimage", "IMG");
+  put("IMG");
 }
 
 device_image_t* bx_hdimage_ctl_c::init_image(Bit8u image_mode, Bit64u disk_size, const char *journal)

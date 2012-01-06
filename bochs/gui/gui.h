@@ -111,7 +111,7 @@ public:
   virtual int get_clipboard_text(Bit8u **bytes, Bit32s *nbytes)  = 0;
   virtual int set_clipboard_text(char *snapshot, Bit32u len) = 0;
   virtual void mouse_enabled_changed_specific (bx_bool val) = 0;
-  virtual void statusbar_setitem_specific(int element, bx_bool active, bx_bool w) {}
+  virtual void statusbar_setitem(int element, bx_bool active, bx_bool w=0) {}
   virtual void set_tooltip(unsigned hbar_id, const char *tip) {}
   virtual void exit(void) = 0;
   // set_display_mode() changes the mode between the configuration interface
@@ -149,8 +149,7 @@ public:
   void cleanup(void);
   void update_drive_status_buttons(void);
   static void     mouse_enabled_changed(bx_bool val);
-  int register_statusitem(const char *text, bx_bool auto_off=0);
-  void statusbar_setitem(int element, bx_bool active, bx_bool w=0);
+  int register_statusitem(const char *text);
   static void init_signal_handlers();
   static void toggle_mouse_enable(void);
   bx_bool mouse_toggle_check(Bit32u key, bx_bool pressed);
@@ -171,9 +170,6 @@ protected:
   static void userbutton_handler(void);
   static void save_restore_handler(void);
 
-  static void led_timer_handler(void *);
-  void led_timer(void);
-
   bx_bool floppyA_status;
   bx_bool floppyB_status;
   bx_bool cdrom1_status;
@@ -193,17 +189,8 @@ protected:
   unsigned char vga_charmap[0x2000];
   bx_bool charmap_updated;
   bx_bool char_changed[256];
-
   unsigned statusitem_count;
-  int led_timer_index;
-  struct {
-    char text[8];
-    bx_bool active;
-    bx_bool mode; // read/write
-    bx_bool auto_off;
-    Bit8u counter;
-  } statusitem[BX_MAX_STATUSITEMS];
-
+  char statusitem_text[BX_MAX_STATUSITEMS][8];
   disp_mode_t disp_mode;
   bx_bool new_gfx_api;
   Bit16u host_xres;

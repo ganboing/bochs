@@ -41,7 +41,6 @@ cpuid
   movbe
   xsave
   xsaveopt
-  svm
   vmx
   avx
   avx_f16c
@@ -231,22 +230,12 @@ network
     ethmod
     ethdev
     script
-    bootrom
   pnic
     enabled
     macaddr
     ethmod
     ethdev
     script
-    bootrom
-
-  e1000
-    enabled
-    macaddr
-    ethmod
-    ethdev
-    script
-    bootrom
 
 sound
   sb16

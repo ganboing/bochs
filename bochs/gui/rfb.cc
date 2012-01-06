@@ -51,7 +51,7 @@ public:
   DECLARE_GUI_VIRTUAL_METHODS()
   DECLARE_GUI_NEW_VIRTUAL_METHODS()
   void get_capabilities(Bit16u *xres, Bit16u *yres, Bit16u *bpp);
-  void statusbar_setitem_specific(int element, bx_bool active, bx_bool w);
+  void statusbar_setitem(int element, bx_bool active, bx_bool w=0);
 #if BX_SHOW_IPS
   void show_ips(Bit32u ips_count);
 #endif
@@ -331,9 +331,15 @@ void rfbSetStatusText(int element, const char *text, bx_bool active, bx_bool w)
   rfbUpdateRegion.updated = true;
 }
 
-void bx_rfb_gui_c::statusbar_setitem_specific(int element, bx_bool active, bx_bool w)
+void bx_rfb_gui_c::statusbar_setitem(int element, bx_bool active, bx_bool w)
 {
-  rfbSetStatusText(element+1, statusitem[element].text, active, w);
+  if (element < 0) {
+    for (unsigned i = 0; i < statusitem_count; i++) {
+      rfbSetStatusText(i+1, statusitem_text[i], 0, 0);
+    }
+  } else if ((unsigned)element < statusitem_count) {
+    rfbSetStatusText(element+1, statusitem_text[element], active, w);
+  }
 }
 
 #ifdef WIN32
@@ -1062,7 +1068,7 @@ void bx_rfb_gui_c::show_headerbar(void)
   DrawBitmap(0, rfbWindowY - rfbStatusbarY, rfbWindowX, rfbStatusbarY, newBits, (char)0xf0, false);
   free(newBits);
   for (i = 1; i <= statusitem_count; i++) {
-    rfbSetStatusText(i, statusitem[i-1].text, rfbStatusitemActive[i]);
+    rfbSetStatusText(i, statusitem_text[i-1], rfbStatusitemActive[i]);
   }
 }
 

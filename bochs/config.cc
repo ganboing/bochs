@@ -43,8 +43,6 @@ Bit8u bx_user_plugin_count = 0;
 
 #define LOG_THIS genlog->
 
-#define BX_MAX_LOGFN_MODULES 20
-
 extern bx_debug_t bx_dbg;
 
 static const char *get_builtin_variable(const char *varname);
@@ -139,78 +137,6 @@ const char *bx_param_string_handler(bx_param_string_c *param, int set,
   return val;
 }
 
-void bx_init_std_nic_options(const char *name, bx_list_c *menu)
-{
-  // networking module choices
-  static const char *eth_module_list[] = {
-    "null",
-#if BX_NETMOD_LINUX
-    "linux",
-#endif
-#if BX_NETMOD_TAP
-    "tap",
-#endif
-#if BX_NETMOD_TUNTAP
-    "tuntap",
-#endif
-#if BX_NETMOD_WIN32
-    "win32",
-#endif
-#if BX_NETMOD_FBSD
-    "fbsd",
-#endif
-#if BX_NETMOD_VDE
-    "vde",
-#endif
-#if BX_NETMOD_SLIRP
-    "slirp",
-#endif
-    "vnet",
-    NULL
-  };
-
-  bx_param_enum_c *ethmod;
-  bx_param_string_c *macaddr;
-  bx_param_filename_c *path, *bootrom;
-  char descr[120];
-
-  sprintf(descr, "MAC address of the %s device. Don't use an address of a machine on your net.", name);
-  macaddr = new bx_param_string_c(menu,
-    "macaddr",
-    "MAC Address",
-    descr,
-    "", 6);
-  macaddr->set_options(macaddr->RAW_BYTES);
-  macaddr->set_initial_val("\xfe\xfd\xde\xad\xbe\xef");
-  macaddr->set_separator(':');
-  ethmod = new bx_param_enum_c(menu,
-    "ethmod",
-    "Ethernet module",
-    "Module used for the connection to the real net.",
-    eth_module_list,
-    0,
-    0);
-  ethmod->set_by_name("null");
-  ethmod->set_ask_format("Choose ethernet module for the device [%s] ");
-  new bx_param_string_c(menu,
-    "ethdev",
-    "Ethernet device",
-    "Device used for the connection to the real net. This is only valid if an ethernet module other than 'null' is used.",
-    "xl0", BX_PATHNAME_LEN);
-  path = new bx_param_filename_c(menu,
-    "script",
-    "Device configuration script",
-    "Name of the script that is executed after Bochs initializes the network interface (optional).",
-    "none", BX_PATHNAME_LEN);
-  path->set_ask_format("Enter new script name, or 'none': [%s] ");
-  bootrom = new bx_param_filename_c(menu,
-    "bootrom",
-    "Boot ROM image",
-    "Pathname of network boot ROM image to load",
-    "", BX_PATHNAME_LEN);
-  bootrom->set_format("Name of boot ROM image: %s");
-}
-
 void bx_init_options()
 {
   int i;
@@ -218,7 +144,8 @@ void bx_init_options()
   bx_list_c *deplist;
   bx_param_num_c *ioaddr, *ioaddr2, *irq;
   bx_param_bool_c *enabled, *readonly, *status;
-  bx_param_enum_c *mode, *type, *toggle;
+  bx_param_enum_c *mode, *type, *ethmod, *toggle;
+  bx_param_string_c *macaddr;
   bx_param_filename_c *path;
   char name[BX_PATHNAME_LEN], descr[512], group[16], label[512];
 
@@ -277,16 +204,6 @@ void bx_init_options()
       "benchmark mode",
       "set benchmark mode",
       0, BX_MAX_BIT32U, 0);
-
-  // subtree for setting up log actions by device in bochsrc
-  bx_list_c *logfn = new bx_list_c(menu, "logfn", "Logfunctions", 4);
-  new bx_list_c(logfn, "debug", "", BX_MAX_LOGFN_MODULES);
-  new bx_list_c(logfn, "info", "", BX_MAX_LOGFN_MODULES);
-  new bx_list_c(logfn, "error", "", BX_MAX_LOGFN_MODULES);
-  new bx_list_c(logfn, "panic", "", BX_MAX_LOGFN_MODULES);
-
-  // optional plugin control (empty list)
-  menu = new bx_list_c(menu, "plugin_ctrl", "Optional Plugin Control", 16);
 
   // subtree for special menus
   bx_list_c *special_menus = new bx_list_c(root_param, "menu", "");
@@ -373,7 +290,7 @@ void bx_init_options()
 
   // cpuid subtree
 #if BX_CPU_LEVEL >= 4
-  bx_list_c *cpuid_param = new bx_list_c(root_param, "cpuid", "CPUID Options", 30);
+  bx_list_c *cpuid_param = new bx_list_c(root_param, "cpuid", "CPUID Options", 29);
 
   new bx_param_string_c(cpuid_param,
       "vendor_string",
@@ -421,19 +338,10 @@ void bx_init_options()
       1);
 
   // configure defaults to XAPIC enabled
-  static const char *apic_names[] = {
-    "legacy",
-    "xapic",
-#if BX_CPU_LEVEL >= 6
-    "xapic_ext",
-    "x2apic",
-#endif
-    NULL
-  };
-
+  static const char *apic_names[] = { "legacy", "xapic", "x2apic", NULL };
   new bx_param_enum_c(cpuid_param,
       "apic", "APIC configuration",
-      "Select APIC configuration (Legacy APIC/XAPIC/XAPIC_EXT/X2APIC)",
+      "Select APIC configuration (Legacy APIC/XAPIC/X2APIC)",
       apic_names,
       BX_CPUID_SUPPORT_XAPIC,
       BX_CPUID_SUPPORT_LEGACY_APIC);
@@ -545,13 +453,7 @@ void bx_init_options()
       0, BX_SUPPORT_VMX,
       1);
 #endif
-#if BX_SUPPORT_SVM
-  new bx_param_bool_c(cpuid_param,
-      "svm", "Secure Virtual Machine (SVM) emulation support",
-      "Secure Virtual Machine (SVM) emulation support",
-      0);
 #endif
-#endif // CPU_LEVEL >= 6
 
   cpuid_param->set_options(menu->SHOW_PARENT);
 
@@ -1554,8 +1456,35 @@ void bx_init_options()
   bx_list_c *network = new bx_list_c(root_param, "network", "Network Configuration");
   network->set_options(network->USE_TAB_WINDOW | network->SHOW_PARENT);
 
+  // ne2k & pnic options
+  static const char *eth_module_list[] = {
+    "null",
+#if BX_NETMOD_LINUX
+    "linux",
+#endif
+#if BX_NETMOD_TAP
+    "tap",
+#endif
+#if BX_NETMOD_TUNTAP
+    "tuntap",
+#endif
+#if BX_NETMOD_WIN32
+    "win32",
+#endif
+#if BX_NETMOD_FBSD
+    "fbsd",
+#endif
+#if BX_NETMOD_VDE
+    "vde",
+#endif
+#if BX_NETMOD_SLIRP
+    "slirp",
+#endif
+    "vnet",
+    NULL
+  };
   // ne2k options
-  menu = new bx_list_c(network, "ne2k", "NE2000", 8);
+  menu = new bx_list_c(network, "ne2k", "NE2000", 7);
   menu->set_options(menu->SHOW_PARENT);
   menu->set_enabled(BX_SUPPORT_NE2K);
   enabled = new bx_param_bool_c(menu,
@@ -1578,7 +1507,34 @@ void bx_init_options()
     0, 15,
     9);
   irq->set_options(irq->USE_SPIN_CONTROL);
-  bx_init_std_nic_options("NE2K", menu);
+  macaddr = new bx_param_string_c(menu,
+    "macaddr",
+    "MAC Address",
+    "MAC address of the NE2K device. Don't use an address of a machine on your net.",
+    "", 6);
+  macaddr->set_options(macaddr->RAW_BYTES);
+  macaddr->set_initial_val("\xfe\xfd\xde\xad\xbe\xef");
+  macaddr->set_separator(':');
+  ethmod = new bx_param_enum_c(menu,
+    "ethmod",
+    "Ethernet module",
+    "Module used for the connection to the real net.",
+    eth_module_list,
+    0,
+    0);
+  ethmod->set_by_name("null");
+  ethmod->set_ask_format("Choose ethernet module for the NE2K [%s] ");
+  new bx_param_string_c(menu,
+    "ethdev",
+    "Ethernet device",
+    "Device used for the connection to the real net. This is only valid if an ethernet module other than 'null' is used.",
+    "xl0", BX_PATHNAME_LEN);
+  path = new bx_param_filename_c(menu,
+    "script",
+    "Device configuration script",
+    "Name of the script that is executed after Bochs initializes the network interface (optional).",
+    "none", BX_PATHNAME_LEN);
+  path->set_ask_format("Enter new script name, or 'none': [%s] ");
   enabled->set_dependent_list(menu->clone());
   // pnic options
   menu = new bx_list_c(network, "pnic", "PCI Pseudo NIC");
@@ -1590,7 +1546,34 @@ void bx_init_options()
     "Enables the Pseudo NIC emulation",
     0);
   enabled->set_enabled(BX_SUPPORT_PCIPNIC);
-  bx_init_std_nic_options("Pseudo NIC", menu);
+  macaddr = new bx_param_string_c(menu,
+    "macaddr",
+    "MAC Address",
+    "MAC address of the Pseudo NIC device. Don't use an address of a machine on your net.",
+    "", 6);
+  macaddr->set_options(macaddr->RAW_BYTES);
+  macaddr->set_initial_val("\xfe\xfd\xde\xad\xbe\xef");
+  macaddr->set_separator(':');
+  ethmod = new bx_param_enum_c(menu,
+    "ethmod",
+    "Ethernet module",
+    "Module used for the connection to the real net.",
+    eth_module_list,
+    0,
+    0);
+  ethmod->set_by_name("null");
+  ethmod->set_ask_format("Choose ethernet module for the Pseudo NIC [%s]");
+  new bx_param_string_c(menu,
+    "ethdev",
+    "Ethernet device",
+    "Device used for the connection to the real net. This is only valid if an ethernet module other than 'null' is used.",
+    "xl0", BX_PATHNAME_LEN);
+  path = new bx_param_filename_c(menu,
+    "script",
+    "Device configuration script",
+    "Name of the script that is executed after Bochs initializes the network interface (optional).",
+    "none", BX_PATHNAME_LEN);
+  path->set_ask_format("Enter new script name, or 'none': [%s] ");
   enabled->set_dependent_list(menu->clone());
 
   // sound subtree
@@ -1669,6 +1652,27 @@ void bx_init_options()
   deplist->add(logfile);
   loglevel->set_dependent_list(deplist);
 
+  menu = new bx_list_c(sound, "es1370", "ES1370 Configuration", 8);
+  menu->set_options(menu->SHOW_PARENT);
+  menu->set_enabled(BX_SUPPORT_ES1370);
+
+  // ES1370 options
+  enabled = new bx_param_bool_c(menu,
+    "enabled",
+    "Enable ES1370 emulation",
+    "Enables the ES1370 emulation",
+    0);
+  enabled->set_enabled(BX_SUPPORT_ES1370);
+
+  bx_param_filename_c *wavedev = new bx_param_filename_c(menu,
+    "wavedev",
+    "Wave device",
+    "This is the device where the wave output is sent to",
+    "", BX_PATHNAME_LEN);
+  deplist = new bx_list_c(NULL, 1);
+  deplist->add(wavedev);
+  enabled->set_dependent_list(deplist);
+
   // misc options subtree
   bx_list_c *misc = new bx_list_c(root_param, "misc", "Configure Everything Else");
   misc->set_options(misc->SHOW_PARENT);
@@ -1715,6 +1719,20 @@ void bx_init_options()
     0, BX_MAX_BIT32U,
     0);
   enabled->set_dependent_list(menu->clone());
+
+  // optional plugin control
+  menu = new bx_list_c(misc, "plugin_ctrl", "Optional Plugin Control", 9);
+  menu->set_options(menu->SHOW_PARENT | menu->USE_BOX_TITLE);
+  new bx_param_bool_c(menu, "unmapped", "Enable 'unmapped'", "", 1);
+  new bx_param_bool_c(menu, "biosdev", "Enable 'biosdev'", "", 1);
+  new bx_param_bool_c(menu, "speaker", "Enable 'speaker'", "", 1);
+  new bx_param_bool_c(menu, "extfpuirq", "Enable 'extfpuirq'", "", 1);
+#if BX_SUPPORT_GAMEPORT
+  new bx_param_bool_c(menu, "gameport", "Enable 'gameport'", "", 1);
+#endif
+#if BX_SUPPORT_IODEBUG
+  new bx_param_bool_c(menu, "iodebug", "Enable 'iodebug'", "", 1);
+#endif
 
 #if BX_PLUGINS
   // user plugin options
@@ -1819,10 +1837,10 @@ void bx_reset_options()
   // serial/parallel/usb
   SIM->get_param("ports")->reset();
 
-  // network devices
+  // ne2k & pnic
   SIM->get_param("network")->reset();
 
-  // sound devices
+  // SB16 & ES1370
   SIM->get_param("sound")->reset();
 
   // misc
@@ -2139,65 +2157,33 @@ int get_floppy_type_from_image(const char *filename)
   }
 }
 
-static Bit32s parse_log_options(const char *context, int num_params, char *params[])
+static Bit32s parse_log_options(const char *context, char *loglev, char *param1)
 {
-  int level, action, i;
-  bx_bool def_action = 0;
-  char *param, *module, *actstr;
-  char pname[20];
-  bx_list_c *base;
-  bx_param_num_c *mparam;
+  int level;
 
-  if (!strcmp(params[0], "panic")) {
+  if (!strcmp(loglev, "panic")) {
     level = LOGLEV_PANIC;
-  } else if (!strcmp(params[0], "error")) {
+  } else if (!strcmp(loglev, "error")) {
     level = LOGLEV_ERROR;
-  } else if (!strcmp(params[0], "info")) {
+  } else if (!strcmp(loglev, "info")) {
     level = LOGLEV_INFO;
   } else { /* debug */
     level = LOGLEV_DEBUG;
   }
-  for (i = 1; i < num_params; i++) {
-    param = strdup(params[i]);
-    module = strtok(param, "=");
-    actstr = strtok(NULL, "");
-    if (actstr != NULL) {
-      def_action = !strcmp(module, "action");
-      if (!strcmp(actstr, "fatal"))
-        action = ACT_FATAL;
-      else if (!strcmp (actstr, "report"))
-        action = ACT_REPORT;
-      else if (!strcmp (actstr, "ignore"))
-        action = ACT_IGNORE;
-      else if (!strcmp (actstr, "ask"))
-        action = ACT_ASK;
-      else {
-        PARSE_ERR(("%s: %s directive malformed.", context, params[0]));
-        free(param);
-        return -1;
-      }
-      if (def_action) {
-        SIM->set_default_log_action(level, action);
-      } else {
-        sprintf(pname, "general.logfn.%s", params[0]);
-        base = (bx_list_c*) SIM->get_param(pname);
-        mparam = (bx_param_num_c*) base->get_by_name(module);
-        if (mparam != NULL) {
-          mparam->set(action);
-        } else {
-          if (base->get_size() < BX_MAX_LOGFN_MODULES) {
-            mparam = new bx_param_num_c(base, module, "", "", 0, BX_MAX_BIT32U, action);
-          } else {
-            PARSE_ERR(("%s: %s: too many log modules (max = %d).", context, params[0], BX_MAX_LOGFN_MODULES));
-          }
-        }
-      }
-    } else {
-      PARSE_ERR(("%s: %s directive malformed.", context, params[0]));
-      free(param);
-      return -1;
-    }
-    free(param);
+  if (strncmp(param1, "action=", 7)) {
+    PARSE_ERR(("%s: %s directive malformed.", context, loglev));
+  }
+  char *action = param1 + 7;
+  if (!strcmp(action, "fatal"))
+    SIM->set_default_log_action(level, ACT_FATAL);
+  else if (!strcmp (action, "report"))
+    SIM->set_default_log_action(level, ACT_REPORT);
+  else if (!strcmp (action, "ignore"))
+    SIM->set_default_log_action(level, ACT_IGNORE);
+  else if (!strcmp (action, "ask"))
+    SIM->set_default_log_action(level, ACT_ASK);
+  else {
+    PARSE_ERR(("%s: %s directive malformed.", context, loglev));
   }
   return 0;
 }
@@ -2267,41 +2253,6 @@ static int parse_usb_port_params(const char *context, bx_bool devopt, const char
   sprintf(tmpname, "port%d.%s", idx, devopt ? "options" : "device");
   SIM->get_param_string(tmpname, base)->set(&param[plen + 2]);
   return 0;
-}
-
-int bx_parse_nic_params(const char *context, const char *param, bx_list_c *base)
-{
-  int tmp[6];
-  char tmpchar[6];
-  int valid = 0;
-  int n;
-
-  if (!strncmp(param, "enabled=", 8)) {
-    if (atol(&param[8]) == 0) valid |= 0x80;
-  } else if (!strncmp(param, "mac=", 4)) {
-    n = sscanf(&param[4], "%x:%x:%x:%x:%x:%x",
-               &tmp[0],&tmp[1],&tmp[2],&tmp[3],&tmp[4],&tmp[5]);
-    if (n != 6) {
-      PARSE_ERR(("%s: '%s' mac address malformed.", context, base->get_name()));
-    }
-    for (n=0;n<6;n++)
-      tmpchar[n] = (unsigned char)tmp[n];
-    SIM->get_param_string("macaddr", base)->set(tmpchar);
-    valid |= 0x04;
-  } else if (!strncmp(param, "ethmod=", 7)) {
-    if (!SIM->get_param_enum("ethmod", base)->set_by_name(&param[7]))
-      PARSE_ERR(("%s: ethernet module '%s' not available", context, &param[7]));
-  } else if (!strncmp(param, "ethdev=", 7)) {
-    SIM->get_param_string("ethdev", base)->set(&param[7]);
-  } else if (!strncmp(param, "script=", 7)) {
-    SIM->get_param_string("script", base)->set(&param[7]);
-  } else if (!strncmp(param, "bootrom=", 8)) {
-    SIM->get_param_string("bootrom", base)->set(&param[8]);
-  } else {
-    PARSE_WARN(("%s: unknown parameter '%s' for '%s' ignored.", context, param, base->get_name()));
-    return -1;
-  }
-  return valid;
 }
 
 static int parse_line_formatted(const char *context, int num_params, char *params[])
@@ -2631,31 +2582,31 @@ static int parse_line_formatted(const char *context, int num_params, char *param
     }
     SIM->get_param_string(BXPN_DEBUGGER_LOG_FILENAME)->set(params[1]);
   } else if (!strcmp(params[0], "panic")) {
-    if (num_params < 2) {
+    if (num_params != 2) {
       PARSE_ERR(("%s: panic directive malformed.", context));
     }
-    if (parse_log_options(context, num_params, params) < 0) {
+    if (parse_log_options(context, params[0], params[1]) < 0) {
       return -1;
     }
   } else if (!strcmp(params[0], "error")) {
-    if (num_params < 2) {
+    if (num_params != 2) {
       PARSE_ERR(("%s: error directive malformed.", context));
     }
-    if (parse_log_options(context, num_params, params) < 0) {
+    if (parse_log_options(context, params[0], params[1]) < 0) {
       return -1;
     }
   } else if (!strcmp(params[0], "info")) {
-    if (num_params < 2) {
+    if (num_params != 2) {
       PARSE_ERR(("%s: info directive malformed.", context));
     }
-    if (parse_log_options(context, num_params, params) < 0) {
+    if (parse_log_options(context, params[0], params[1]) < 0) {
       return -1;
     }
   } else if (!strcmp(params[0], "debug")) {
-    if (num_params < 2) {
+    if (num_params != 2) {
       PARSE_ERR(("%s: debug directive malformed.", context));
     }
-    if (parse_log_options(context, num_params, params) < 0) {
+    if (parse_log_options(context, params[0], params[1]) < 0) {
       return -1;
     }
   } else if (!strcmp(params[0], "cpu")) {
@@ -2792,12 +2743,6 @@ static int parse_line_formatted(const char *context, int num_params, char *param
 #if BX_SUPPORT_VMX
       } else if (!strncmp(params[i], "vmx=", 4)) {
         SIM->get_param_num(BXPN_CPUID_VMX)->set(atol(&params[i][4]));
-#endif
-#if BX_SUPPORT_SVM
-      } else if (!strncmp(params[i], "svm=", 4)) {
-        if (parse_param_bool(params[i], 4, BXPN_CPUID_SVM) < 0) {
-          PARSE_ERR(("%s: cpuid directive malformed.", context));
-        }
 #endif
 #if BX_SUPPORT_X86_64
       } else if (!strncmp(params[i], "x86_64=", 7)) {
@@ -3054,6 +2999,17 @@ static int parse_line_formatted(const char *context, int num_params, char *param
       SIM->get_param_bool("enabled", base)->set(1);
     else
       SIM->get_param_bool("enabled", base)->set(0);
+  } else if (!strcmp(params[0], "es1370")) {
+    base = (bx_list_c*) SIM->get_param(BXPN_SOUND_ES1370);
+    for (i=1; i<num_params; i++) {
+      if (!strncmp(params[i], "enabled=", 8)) {
+        SIM->get_param_bool("enabled", base)->set(atol(&params[i][8]));
+      } else if (!strncmp(params[i], "wavedev=", 8)) {
+        SIM->get_param_string("wavedev", base)->set(&params[i][8]);
+      } else {
+        BX_ERROR(("%s: unknown parameter for es1370 ignored.", context));
+      }
+    }
   } else if ((!strncmp(params[0], "com", 3)) && (strlen(params[0]) == 4)) {
     char tmpname[80];
     idx = params[0][3];
@@ -3350,8 +3306,11 @@ static int parse_line_formatted(const char *context, int num_params, char *param
     }
   }
   else if (!strcmp(params[0], "ne2k")) {
+    int tmp[6];
+    char tmpchar[6];
     char tmpdev[80];
-    int ret, valid = 0;
+    int valid = 0;
+    int n;
     base = (bx_list_c*) SIM->get_param(BXPN_NE2K);
     if (!SIM->get_param_bool("enabled", base)->get()) {
       SIM->get_param_enum("ethmod", base)->set_by_name("null");
@@ -3366,17 +3325,40 @@ static int parse_line_formatted(const char *context, int num_params, char *param
       }
     }
     for (i=1; i<num_params; i++) {
-      if (!strncmp(params[i], "ioaddr=", 7)) {
+      if (!strncmp(params[i], "enabled=", 8)) {
+        if (atol(&params[i][8]) == 0) valid |= 0x80;
+      }
+      else if (!strncmp(params[i], "ioaddr=", 7)) {
         SIM->get_param_num("ioaddr", base)->set(strtoul(&params[i][7], NULL, 16));
         valid |= 0x01;
-      } else if (!strncmp(params[i], "irq=", 4)) {
+      }
+      else if (!strncmp(params[i], "irq=", 4)) {
         SIM->get_param_num("irq", base)->set(atol(&params[i][4]));
         valid |= 0x02;
-      } else {
-        ret = bx_parse_nic_params(context, params[i], base);
-        if (ret > 0) {
-          valid |= ret;
+      }
+      else if (!strncmp(params[i], "mac=", 4)) {
+        n = sscanf(&params[i][4], "%x:%x:%x:%x:%x:%x",
+                   &tmp[0],&tmp[1],&tmp[2],&tmp[3],&tmp[4],&tmp[5]);
+        if (n != 6) {
+          PARSE_ERR(("%s: ne2k mac address malformed.", context));
         }
+        for (n=0;n<6;n++)
+          tmpchar[n] = (unsigned char)tmp[n];
+        SIM->get_param_string("macaddr", base)->set(tmpchar);
+        valid |= 0x04;
+      }
+      else if (!strncmp(params[i], "ethmod=", 7)) {
+        if (!SIM->get_param_enum("ethmod", base)->set_by_name(&params[i][7]))
+          PARSE_ERR(("%s: ethernet module '%s' not available", context, &params[i][7]));
+      }
+      else if (!strncmp(params[i], "ethdev=", 7)) {
+        SIM->get_param_string("ethdev", base)->set(&params[i][7]);
+      }
+      else if (!strncmp(params[i], "script=", 7)) {
+        SIM->get_param_string("script", base)->set(&params[i][7]);
+      }
+      else {
+        PARSE_WARN(("%s: unknown parameter '%s' for ne2k ignored.", context, params[i]));
       }
     }
     if (!SIM->get_param_bool("enabled", base)->get()) {
@@ -3384,10 +3366,10 @@ static int parse_line_formatted(const char *context, int num_params, char *param
         SIM->get_param_bool("enabled", base)->set(1);
       } else if (valid < 0x80) {
         if ((valid & 0x03) != 0x03) {
-          PARSE_ERR(("%s: 'ne2k' directive incomplete (ioaddr and irq are required)", context));
+          PARSE_ERR(("%s: ne2k directive incomplete (ioaddr and irq are required)", context));
         }
         if ((valid & 0x04) == 0) {
-          PARSE_ERR(("%s: 'ne2k' directive incomplete (mac address is required)", context));
+          PARSE_ERR(("%s: ne2k directive incomplete (mac address is required)", context));
         }
       }
     } else {
@@ -3396,22 +3378,43 @@ static int parse_line_formatted(const char *context, int num_params, char *param
       }
     }
   } else if (!strcmp(params[0], "pnic")) {
-    int ret, valid = 0;
+    int tmp[6];
+    char tmpchar[6];
+    int valid = 0;
+    int n;
     base = (bx_list_c*) SIM->get_param(BXPN_PNIC);
     if (!SIM->get_param_bool("enabled", base)->get()) {
       SIM->get_param_enum("ethmod", base)->set_by_name("null");
     }
     for (i=1; i<num_params; i++) {
-      ret = bx_parse_nic_params(context, params[i], base);
-      if (ret > 0) {
-        valid |= ret;
+      if (!strncmp(params[i], "enabled=", 8)) {
+        if (atol(&params[i][8]) == 0) valid |= 0x80;
+      } else if (!strncmp(params[i], "mac=", 4)) {
+        n = sscanf(&params[i][4], "%x:%x:%x:%x:%x:%x",
+                   &tmp[0],&tmp[1],&tmp[2],&tmp[3],&tmp[4],&tmp[5]);
+        if (n != 6) {
+          PARSE_ERR(("%s: pnic mac address malformed.", context));
+        }
+        for (n=0;n<6;n++)
+          tmpchar[n] = (unsigned char)tmp[n];
+        SIM->get_param_string("macaddr", base)->set(tmpchar);
+        valid |= 0x07;
+      } else if (!strncmp(params[i], "ethmod=", 7)) {
+        if (!SIM->get_param_enum("ethmod", base)->set_by_name(&params[i][7]))
+          PARSE_ERR(("%s: ethernet module '%s' not available", context, &params[i][7]));
+      } else if (!strncmp(params[i], "ethdev=", 7)) {
+        SIM->get_param_string("ethdev", base)->set(&params[i][7]);
+      } else if (!strncmp(params[i], "script=", 7)) {
+        SIM->get_param_string("script", base)->set(&params[i][7]);
+      } else {
+        PARSE_WARN(("%s: unknown parameter '%s' for pnic ignored.", context, params[i]));
       }
     }
     if (!SIM->get_param_bool("enabled", base)->get()) {
-      if (valid == 0x04) {
+      if (valid == 0x07) {
         SIM->get_param_bool("enabled", base)->set(1);
       } else if (valid < 0x80) {
-        PARSE_ERR(("%s: 'pnic' directive incomplete (mac is required)", context));
+        PARSE_ERR(("%s: pnic directive incomplete (mac is required)", context));
       }
     } else {
       if (valid & 0x80) {
@@ -3519,41 +3522,24 @@ static int parse_line_formatted(const char *context, int num_params, char *param
   }
 #endif
   else if (!strcmp(params[0], "plugin_ctrl")) {
-    char *param, *pname, *val;
+    char *pname, *val;
     bx_param_bool_c *plugin;
     for (i=1; i<num_params; i++) {
-      param = strdup(params[i]);
-      pname = strtok(param, "=");
+      pname = strtok(params[i], "=");
       val = strtok(NULL, "");
-      if (val != NULL) {
-        if (isdigit(val[0])) {
-          bx_bool load = atoi(val);
-          base = (bx_list_c*)SIM->get_param(BXPN_PLUGIN_CTRL);
-          if (load != PLUG_device_present(pname)) {
-            if (load) {
-              if (PLUG_load_opt_plugin(pname)) {
-                plugin = new bx_param_bool_c(base, pname, "", "", 1);
-              } else {
-                BX_PANIC(("optional plugin '%s' not found", pname));
-              }
-            } else {
-              PLUG_unload_opt_plugin(pname);
-              base->remove(pname);
-            }
-          }
-        } else {
-          PARSE_ERR(("%s: plugin_ctrl directive malformed", context));
-        }
+      base = (bx_list_c*)SIM->get_param(BXPN_PLUGIN_CTRL);
+      plugin = (bx_param_bool_c*)base->get_by_name(pname);
+      if (plugin != NULL) {
+        plugin->set(atoi(val));
       } else {
-        PARSE_ERR(("%s: plugin_ctrl directive malformed", context));
+        PARSE_ERR(("%s: unknown optional plugin '%s'", context, pname));
       }
-      free(param);
     }
   }
   // user-defined options handled by registered functions
-  else if (SIM->is_addon_option(params[0]))
+  else if (SIM->is_user_option(params[0]))
   {
-    return SIM->parse_addon_option(context, num_params, &params[0]);
+    return SIM->parse_user_option(context, num_params, &params[0]);
   }
   else
   {
@@ -3697,12 +3683,12 @@ int bx_write_usb_options(FILE *fp, int maxports, bx_list_c *base)
   return 0;
 }
 
-int bx_write_pci_nic_options(FILE *fp, bx_list_c *base)
+int bx_write_pnic_options(FILE *fp, bx_list_c *base)
 {
-  fprintf (fp, "%s: enabled=%d", base->get_name(), SIM->get_param_bool("enabled", base)->get());
+  fprintf (fp, "pnic: enabled=%d", SIM->get_param_bool("enabled", base)->get());
   if (SIM->get_param_bool("enabled", base)->get()) {
     char *ptr = SIM->get_param_string("macaddr", base)->getptr();
-    fprintf (fp, ", mac=%02x:%02x:%02x:%02x:%02x:%02x, ethmod=%s, ethdev=%s, script=%s, bootrom=%s",
+    fprintf (fp, ", mac=%02x:%02x:%02x:%02x:%02x:%02x, ethmod=%s, ethdev=%s, script=%s",
       (unsigned int)(0xff & ptr[0]),
       (unsigned int)(0xff & ptr[1]),
       (unsigned int)(0xff & ptr[2]),
@@ -3711,8 +3697,7 @@ int bx_write_pci_nic_options(FILE *fp, bx_list_c *base)
       (unsigned int)(0xff & ptr[5]),
       SIM->get_param_enum("ethmod", base)->get_selected(),
       SIM->get_param_string("ethdev", base)->getptr(),
-      SIM->get_param_string("script", base)->getptr(),
-      SIM->get_param_string("bootrom", base)->getptr());
+      SIM->get_param_string("script", base)->getptr());
   }
   fprintf (fp, "\n");
   return 0;
@@ -3723,7 +3708,7 @@ int bx_write_ne2k_options(FILE *fp, bx_list_c *base)
   fprintf(fp, "ne2k: enabled=%d", SIM->get_param_bool("enabled", base)->get());
   if (SIM->get_param_bool("enabled", base)->get()) {
     char *ptr = SIM->get_param_string("macaddr", base)->getptr();
-    fprintf(fp, ", ioaddr=0x%x, irq=%d, mac=%02x:%02x:%02x:%02x:%02x:%02x, ethmod=%s, ethdev=%s, script=%s, bootrom=%s",
+    fprintf(fp, ", ioaddr=0x%x, irq=%d, mac=%02x:%02x:%02x:%02x:%02x:%02x, ethmod=%s, ethdev=%s, script=%s",
       SIM->get_param_num("ioaddr", base)->get(),
       SIM->get_param_num("irq", base)->get(),
       (unsigned int)(0xff & ptr[0]),
@@ -3734,8 +3719,7 @@ int bx_write_ne2k_options(FILE *fp, bx_list_c *base)
       (unsigned int)(0xff & ptr[5]),
       SIM->get_param_enum("ethmod", base)->get_selected(),
       SIM->get_param_string("ethdev", base)->getptr(),
-      SIM->get_param_string("script", base)->getptr(),
-      SIM->get_param_string("bootrom", base)->getptr());
+      SIM->get_param_string("script", base)->getptr());
   }
   fprintf(fp, "\n");
   return 0;
@@ -3754,6 +3738,8 @@ int bx_write_sound_options(FILE *fp, bx_list_c *base)
         SIM->get_param_num("loglevel", base)->get(),
         SIM->get_param_string("logfile", base)->getptr(),
         SIM->get_param_num("dmatimer", base)->get());
+    } else if (!strcmp(base->get_name(), "es1370")) {
+      fprintf(fp, ", wavedev=%s", SIM->get_param_string("wavedev", base)->getptr());
     }
   }
   fprintf(fp, "\n");
@@ -3888,16 +3874,6 @@ int bx_write_configuration(const char *rc, int overwrite)
   if (fp == NULL) return -1;
   // finally it's open and we can start writing.
   fprintf(fp, "# configuration file generated by Bochs\n");
-  base = (bx_list_c*) SIM->get_param(BXPN_PLUGIN_CTRL);
-  if (base->get_size() > 0) {
-    fprintf(fp, "plugin_ctrl: ");
-    for (i = 0; i < base->get_size(); i++) {
-      if (i > 0) fprintf(fp, ", ");
-      bx_param_bool_c *plugin = (bx_param_bool_c*)(base->get(i));
-      fprintf(fp, "%s=1", plugin->get_name());
-    }
-    fprintf(fp, "\n");
-  }
 #if BX_PLUGINS
   // user plugins
   for (i=0; i<BX_N_USER_PLUGINS; i++) {
@@ -3908,6 +3884,15 @@ int bx_write_configuration(const char *rc, int overwrite)
     }
   }
 #endif
+
+  fprintf(fp, "plugin_ctrl: ");
+  base = (bx_list_c*) SIM->get_param(BXPN_PLUGIN_CTRL);
+  for (i=0; i<base->get_size(); i++) {
+    if (i > 0) fprintf(fp, ", ");
+    bx_param_bool_c *plugin = (bx_param_bool_c*)(base->get(i));
+    fprintf(fp, "%s=%d", plugin->get_name(), plugin->get());
+  }
+  fprintf(fp, "\n");
   fprintf(fp, "config_interface: %s\n", SIM->get_param_enum(BXPN_SEL_CONFIG_INTERFACE)->get_selected());
   fprintf(fp, "display_library: %s", SIM->get_param_enum(BXPN_SEL_DISPLAY_LIBRARY)->get_selected());
   strptr = SIM->get_param_string(BXPN_DISPLAYLIB_OPTIONS)->getptr();
@@ -4064,9 +4049,6 @@ int bx_write_configuration(const char *rc, int overwrite)
 #if BX_SUPPORT_VMX
   fprintf(fp, ", vmx=%d", SIM->get_param_num(BXPN_CPUID_VMX)->get());
 #endif
-#if BX_SUPPORT_SVM
-  fprintf(fp, ", svm=%d", SIM->get_param_num(BXPN_CPUID_SVM)->get());
-#endif
 #if BX_SUPPORT_X86_64
   fprintf(fp, ", x86_64=%d, 1g_pages=%d, pcid=%d, fsgsbase=%d",
     SIM->get_param_bool(BXPN_CPUID_X86_64)->get(),
@@ -4101,8 +4083,9 @@ int bx_write_configuration(const char *rc, int overwrite)
 #endif
   bx_write_clock_cmos_options(fp);
   bx_write_ne2k_options(fp, (bx_list_c*) SIM->get_param(BXPN_NE2K));
-  bx_write_pci_nic_options(fp, (bx_list_c*) SIM->get_param(BXPN_PNIC));
+  bx_write_pnic_options(fp, (bx_list_c*) SIM->get_param(BXPN_PNIC));
   bx_write_sound_options(fp, (bx_list_c*) SIM->get_param(BXPN_SOUND_SB16));
+  bx_write_sound_options(fp, (bx_list_c*) SIM->get_param(BXPN_SOUND_ES1370));
   bx_write_loader_options(fp);
   bx_write_log_options(fp, (bx_list_c*) SIM->get_param("log"));
   bx_write_keyboard_options(fp);
@@ -4110,7 +4093,7 @@ int bx_write_configuration(const char *rc, int overwrite)
     SIM->get_param_bool(BXPN_MOUSE_ENABLED)->get(),
     SIM->get_param_enum(BXPN_MOUSE_TYPE)->get_selected(),
     SIM->get_param_enum(BXPN_MOUSE_TOGGLE)->get_selected());
-  SIM->save_addon_options(fp);
+  SIM->save_user_options(fp);
   fclose(fp);
   return 0;
 }

@@ -1008,27 +1008,6 @@ void bx_sr_after_restore_state(void)
   DEV_after_restore_state();
 }
 
-void bx_set_log_action_by_device()
-{
-  int id, l, m;
-  bx_list_c *loglev, *level;
-  bx_param_num_c *action;
-
-  loglev = (bx_list_c*) SIM->get_param("general.logfn");
-  for (l = 0; l < loglev->get_size(); l++) {
-    level = (bx_list_c*) loglev->get(l);
-    for (m = 0; m < level->get_size(); m++) {
-      action = (bx_param_num_c*) level->get(m);
-      id = SIM->get_logfn_id(action->get_name());
-      if (id < 0) {
-        BX_PANIC(("unknown log function module '%s'", action->get_name()));
-      } else {
-        SIM->set_log_action(id, l, action->get());
-      }
-    }
-  }
-}
-
 void bx_init_hardware()
 {
   // all configuration has been read, now initialize everything.
@@ -1108,8 +1087,8 @@ void bx_init_hardware()
 #if BX_SUPPORT_X86_64
     bx_bool x86_64_enabled = SIM->get_param_bool(BXPN_CPUID_X86_64)->get();
     BX_INFO(("  x86-64 support: %s", x86_64_enabled?"yes":"no"));
-    bx_bool xlarge_enabled = SIM->get_param_bool(BXPN_CPUID_1G_PAGES)->get();
-    BX_INFO(("  1G paging support: %s", xlarge_enabled?"yes":"no"));
+    bx_bool xlarge_pages_enabled = SIM->get_param_bool(BXPN_CPUID_1G_PAGES)->get();
+    BX_INFO(("  1G paging support: %s", xlarge_pages_enabled?"yes":"no"));
 #else
     BX_INFO(("  x86-64 support: no"));
 #endif
@@ -1135,10 +1114,6 @@ void bx_init_hardware()
     else {
       BX_INFO(("  VMX support: no"));
     }
-#endif
-#if BX_SUPPORT_SVM
-    bx_bool svm_enabled = SIM->get_param_bool(BXPN_CPUID_SVM)->get();
-    BX_INFO(("  SVM support: %s", svm_enabled?"yes":"no"));
 #endif
 #endif // BX_CPU_LEVEL >= 6
   }
@@ -1235,8 +1210,6 @@ void bx_init_hardware()
       BX_PANIC(("cannot restore log options"));
       SIM->get_param_bool(BXPN_RESTORE_FLAG)->set(0);
     }
-  } else {
-    bx_set_log_action_by_device();
   }
 
   // will enable A20 line and reset CPU and devices

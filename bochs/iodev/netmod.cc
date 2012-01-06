@@ -41,13 +41,9 @@ bx_netmod_ctl_c* theNetModCtl = NULL;
 
 int libnetmod_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, char *argv[])
 {
-  if (type == PLUGTYPE_CORE) {
-    theNetModCtl = new bx_netmod_ctl_c;
-    bx_devices.pluginNetModCtl = theNetModCtl;
-    return 0; // Success
-  } else {
-    return -1;
-  }
+  theNetModCtl = new bx_netmod_ctl_c;
+  bx_devices.pluginNetModCtl = theNetModCtl;
+  return(0); // Success
 }
 
 void libnetmod_LTX_plugin_fini(void)
@@ -55,7 +51,7 @@ void libnetmod_LTX_plugin_fini(void)
   delete theNetModCtl;
 }
 
-void* bx_netmod_ctl_c::init_module(bx_list_c *base, void *rxh, void *rxstat, bx_devmodel_c *netdev)
+void* bx_netmod_ctl_c::init_module(bx_list_c *base, void *rxh, bx_devmodel_c *netdev)
 {
   eth_pktmover_c *ethmod;
 
@@ -64,7 +60,7 @@ void* bx_netmod_ctl_c::init_module(bx_list_c *base, void *rxh, void *rxstat, bx_
   ethmod = eth_locator_c::create(modname,
                                  SIM->get_param_string("ethdev", base)->getptr(),
                                  (const char *) SIM->get_param_string("macaddr", base)->getptr(),
-                                 (eth_rx_handler_t)rxh, (eth_rx_status_t)rxstat, netdev,
+                                 (eth_rx_handler_t)rxh, netdev,
                                  SIM->get_param_string("script", base)->getptr());
 
   if (ethmod == NULL) {
@@ -74,7 +70,7 @@ void* bx_netmod_ctl_c::init_module(bx_list_c *base, void *rxh, void *rxstat, bx_
 
     ethmod = eth_locator_c::create("null", NULL,
                                    (const char *) SIM->get_param_string("macaddr", base)->getptr(),
-                                   (eth_rx_handler_t)rxh, (eth_rx_status_t)rxstat, netdev, "");
+                                   (eth_rx_handler_t)rxh, netdev, "");
     if (ethmod == NULL)
       BX_PANIC(("could not locate null module"));
   }
@@ -125,13 +121,13 @@ extern class bx_vnet_locator_c bx_vnet_match;
 eth_pktmover_c *
 eth_locator_c::create(const char *type, const char *netif,
                       const char *macaddr,
-                      eth_rx_handler_t rxh, eth_rx_status_t rxstat,
-                      bx_devmodel_c *dev, const char *script)
+                      eth_rx_handler_t rxh, bx_devmodel_c *dev,
+                      const char *script)
 {
 #ifdef eth_static_constructors
   for (eth_locator_c *p = all; p != NULL; p = p->next) {
     if (strcmp(type, p->type) == 0)
-      return (p->allocate(netif, macaddr, rxh, rxstat, dev, script));
+      return (p->allocate(netif, macaddr, rxh, dev, script));
   }
 #else
   eth_locator_c *ptr = 0;
@@ -185,7 +181,7 @@ eth_locator_c::create(const char *type, const char *netif,
     ptr = (eth_locator_c *) &bx_vnet_match;
   }
   if (ptr) {
-    return (ptr->allocate(netif, macaddr, rxh, rxstat, dev, script));
+    return (ptr->allocate(netif, macaddr, rxh, dev, script));
   }
 #endif
 
@@ -248,6 +244,34 @@ void write_pktlog_txt(FILE *pktlog_txt, const Bit8u *buf, unsigned len, bx_bool 
   }
   fprintf(pktlog_txt, "\n--\n");
   fflush(pktlog_txt);
+}
+
+Bit16u get_net2(const Bit8u *buf)
+{
+  return (((Bit16u)*buf) << 8) |
+         ((Bit16u)*(buf+1));
+}
+
+void put_net2(Bit8u *buf,Bit16u data)
+{
+  *buf = (Bit8u)(data >> 8);
+  *(buf+1) = (Bit8u)(data & 0xff);
+}
+
+Bit32u get_net4(const Bit8u *buf)
+{
+  return (((Bit32u)*buf) << 24) |
+         (((Bit32u)*(buf+1)) << 16) |
+         (((Bit32u)*(buf+2)) << 8) |
+         ((Bit32u)*(buf+3));
+}
+
+void put_net4(Bit8u *buf,Bit32u data)
+{
+  *buf = (Bit8u)((data >> 24) & 0xff);
+  *(buf+1) = (Bit8u)((data >> 16) & 0xff);
+  *(buf+2) = (Bit8u)((data >> 8) & 0xff);
+  *(buf+3) = (Bit8u)(data & 0xff);
 }
 
 Bit16u ip_checksum(const Bit8u *buf, unsigned buf_len)

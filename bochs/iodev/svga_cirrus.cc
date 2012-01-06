@@ -224,15 +224,11 @@ static bx_svga_cirrus_c *theSvga = NULL;
 
 int libvga_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, char *argv[])
 {
-  if (type == PLUGTYPE_CORE) {
-    theSvga = new bx_svga_cirrus_c();
-    bx_vga_set_smf_pointer(theSvga);
-    bx_devices.pluginVgaDevice = theSvga;
-    BX_REGISTER_DEVICE_DEVMODEL(plugin, type, theSvga, BX_PLUGIN_VGA);
-    return 0; // Success
-  } else {
-    return -1;
-  }
+  theSvga = new bx_svga_cirrus_c();
+  bx_vga_set_smf_pointer(theSvga);
+  bx_devices.pluginVgaDevice = theSvga;
+  BX_REGISTER_DEVICE_DEVMODEL(plugin, type, theSvga, BX_PLUGIN_VGA);
+  return(0); // Success
 }
 
 void libvga_LTX_plugin_fini(void)
@@ -253,7 +249,7 @@ bx_svga_cirrus_c::~bx_svga_cirrus_c()
 void bx_svga_cirrus_c::init_vga_extension(void)
 {
   if (!strcmp(SIM->get_param_string(BXPN_VGA_EXTENSION)->getptr(), "cirrus")) {
-    BX_CIRRUS_THIS put("cirrus", "CLVGA");
+    BX_CIRRUS_THIS put("CLVGA");
     // initialize SVGA stuffs.
     BX_CIRRUS_THIS bx_vga_c::init_iohandlers(svga_read_handler, svga_write_handler);
     BX_CIRRUS_THIS bx_vga_c::init_systemtimer(svga_timer_handler, svga_param_handler);

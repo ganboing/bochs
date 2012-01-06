@@ -128,7 +128,8 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_SwEw(bxInstruction_c *i)
     // trap exceptions until the execution boundary following the
     // next instruction is reached.
     // Same code as POP_SS()
-    inhibit_interrupts(BX_INHIBIT_INTERRUPTS_BY_MOVSS);
+    BX_CPU_THIS_PTR inhibit_mask |= BX_INHIBIT_INTERRUPTS_BY_MOVSS;
+    BX_CPU_THIS_PTR async_event = 1;
   }
 
   BX_NEXT_INSTR(i);

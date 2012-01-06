@@ -201,7 +201,7 @@ static int decode_slip(Bit8u *src, size_t *src_len, Bit8u *dst, size_t *dst_len)
 class bx_slirp_pktmover_c : public eth_pktmover_c {
 public:
   bx_slirp_pktmover_c(const char *netif, const char *macaddr,
-                     eth_rx_handler_t rxh, eth_rx_status_t rxstat,
+                     eth_rx_handler_t rxh,
                      bx_devmodel_c *dev, const char *script);
   void sendpkt(void *buf, unsigned io_len);
 private:
@@ -218,9 +218,7 @@ private:
   dhcp_cfg_t dhcp;
 
   int rx_timer_index;
-  unsigned netdev_speed;
   unsigned tx_time;
-
   static void rx_timer_handler(void *);
   void rx_timer();
 
@@ -238,16 +236,15 @@ public:
   bx_slirp_locator_c(void) : eth_locator_c("slirp") {}
 protected:
   eth_pktmover_c *allocate(const char *netif, const char *macaddr,
-                           eth_rx_handler_t rxh, eth_rx_status_t rxstat,
+                           eth_rx_handler_t rxh,
                            bx_devmodel_c *dev, const char *script) {
-    return (new bx_slirp_pktmover_c(netif, macaddr, rxh, rxstat, dev, script));
+    return (new bx_slirp_pktmover_c(netif, macaddr, rxh, dev, script));
   }
 } bx_slirp_match;
 
 bx_slirp_pktmover_c::bx_slirp_pktmover_c(const char *netif,
                                          const char *macaddr,
                                          eth_rx_handler_t rxh,
-                                         eth_rx_status_t rxstat,
                                          bx_devmodel_c *dev,
                                          const char *script)
 {
@@ -296,14 +293,10 @@ bx_slirp_pktmover_c::bx_slirp_pktmover_c(const char *netif,
     }
   }
 
-  this->rxh   = rxh;
-  this->rxstat = rxstat;
-  Bit32u status = this->rxstat(this->netdev) & BX_NETDEV_SPEED;
-  this->netdev_speed = (status == BX_NETDEV_1GBIT) ? 1000 :
-                       (status == BX_NETDEV_100MBIT) ? 100 : 10;
   this->rx_timer_index =
     bx_pc_system.register_timer(this, this->rx_timer_handler, 1000,
                                 1, 1, "eth_slirp");
+  this->rxh   = rxh;
   memcpy(&dhcp.guest_macaddr[0], macaddr, ETHERNET_MAC_ADDR_LEN);
   // ensure the slirp host has a different mac address
   memcpy(&dhcp.host_macaddr[0], macaddr, ETHERNET_MAC_ADDR_LEN);
@@ -486,7 +479,7 @@ void bx_slirp_pktmover_c::sendpkt(void *buf, unsigned io_len)
 #if BX_ETH_SLIRP_LOGGING
   write_pktlog_txt(pktlog_txt, (Bit8u*)buf, io_len, 0);
 #endif
-  this->tx_time = (64 + 96 + 4 * 8 + io_len * 8) / this->netdev_speed;
+  this->tx_time = (64 + 96 + 4 * 8 + io_len * 8) / 10;
   switch (ntohs(ethhdr->type)) {
     case ETHERNET_TYPE_IPV4: 
       if (!handle_ipv4((Bit8u*)buf, io_len)) {
@@ -513,7 +506,7 @@ void bx_slirp_pktmover_c::prepare_builtin_reply(unsigned type)
   memcpy(ethhdr->dst_mac_addr, dhcp.guest_macaddr, ETHERNET_MAC_ADDR_LEN);
   memcpy(ethhdr->src_mac_addr, dhcp.host_macaddr, ETHERNET_MAC_ADDR_LEN);
   ethhdr->type = htons(type);
-  rx_time = (64 + 96 + 4 * 8 + pending_reply_size * 8) / this->netdev_speed;
+  rx_time = (64 + 96 + 4 * 8 + pending_reply_size * 8) / 10;
   bx_pc_system.activate_timer(this->rx_timer_index, this->tx_time + rx_time + 100, 0);
 }
 
@@ -534,11 +527,7 @@ void bx_slirp_pktmover_c::rx_timer()
 #if BX_ETH_SLIRP_LOGGING
     write_pktlog_txt(pktlog_txt, reply_buffer, pending_reply_size, 1);
 #endif
-    if (this->rxstat(this->netdev) & BX_NETDEV_RXREADY) {
-      this->rxh(this->netdev, reply_buffer, pending_reply_size);
-    } else {
-      BX_ERROR(("device not ready to receive data"));
-    }
+    (*rxh)(this->netdev, reply_buffer, pending_reply_size);
     pending_reply_size = 0;
     // restore timer
     bx_pc_system.activate_timer(this->rx_timer_index, 1000, 1);

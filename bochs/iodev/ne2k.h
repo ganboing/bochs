@@ -188,7 +188,6 @@ typedef struct {
     int     base_irq;
     int     tx_timer_index;
     bx_bool tx_timer_active;
-    int     statusbar_id;
 
     // pci stuff
     bx_bool pci_enabled;
@@ -244,16 +243,9 @@ private:
   static void tx_timer_handler(void *);
   BX_NE2K_SMF void tx_timer(void);
 
-  static Bit32u rx_status_handler(void *arg);
-  BX_NE2K_SMF Bit32u rx_status(void);
   static void rx_handler(void *arg, const void *buf, unsigned len);
   BX_NE2K_SMF unsigned mcast_index(const void *dst);
   BX_NE2K_SMF void rx_frame(const void *buf, unsigned io_len);
-
-#if BX_SUPPORT_PCI
-  BX_NE2K_SMF bx_bool mem_read_handler(bx_phy_address addr, unsigned len, void *data, void *param);
-  BX_NE2K_SMF bx_bool mem_write_handler(bx_phy_address addr, unsigned len, void *data, void *param);
-#endif
 
   static Bit32u read_handler(void *this_ptr, Bit32u address, unsigned io_len);
   static void   write_handler(void *this_ptr, Bit32u address, Bit32u value, unsigned io_len);

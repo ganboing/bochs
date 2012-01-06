@@ -99,7 +99,6 @@ public:
   bx_fbsd_pktmover_c(const char *netif,
                      const char *macaddr,
                      eth_rx_handler_t rxh,
-                     eth_rx_status_t rxstat,
                      bx_devmodel_c *dev, const char *script);
   void sendpkt(void *buf, unsigned io_len);
 
@@ -125,9 +124,8 @@ protected:
   eth_pktmover_c *allocate(const char *netif,
                            const char *macaddr,
                            eth_rx_handler_t rxh,
-                           eth_rx_status_t rxstat,
                            bx_devmodel_c *dev, const char *script) {
-    return (new bx_fbsd_pktmover_c(netif, macaddr, rxh, rxstat, dev, script));
+    return (new bx_fbsd_pktmover_c(netif, macaddr, rxh, dev, script));
   }
 } bx_fbsd_match;
 
@@ -144,7 +142,6 @@ protected:
 bx_fbsd_pktmover_c::bx_fbsd_pktmover_c(const char *netif,
                                        const char *macaddr,
                                        eth_rx_handler_t rxh,
-                                       eth_rx_stat_t rxstat,
                                        bx_devmodel_c *dev,
                                        const char *script)
 {
@@ -273,8 +270,7 @@ bx_fbsd_pktmover_c::bx_fbsd_pktmover_c(const char *netif,
     bx_pc_system.register_timer(this, this->rx_timer_handler, BX_BPF_POLL,
                                 1, 1, "eth_fbsd"); // continuous, active
 
-  this->rxh    = rxh;
-  this->rxstat = rxstat;
+  this->rxh   = rxh;
 
 #if BX_ETH_FBSD_LOGGING
   // eventually Bryce wants ne2klog to dump in pcap format so that
@@ -353,11 +349,7 @@ bx_fbsd_pktmover_c::rx_timer(void)
 
     // filter out packets sourced from this node
     if (memcmp(bhdr + bhdr->bh_hdrlen + 6, this->fbsd_macaddr, 6)) {
-      if (this->rxstat(this->netdev) & BX_NETDEV_RXREADY) {
-        this->rxh(this->netdev, phdr + bhdr->bh_hdrlen, bhdr->bh_caplen);
-      } else {
-        BX_ERROR(("device not ready to receive data"));
-      }
+      (*rxh)(this->netdev, phdr + bhdr->bh_hdrlen, bhdr->bh_caplen);
     }
 
 #if BX_ETH_FBSD_LOGGING

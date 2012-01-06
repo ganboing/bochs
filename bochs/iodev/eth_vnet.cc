@@ -105,8 +105,7 @@ public:
   bx_vnet_pktmover_c();
   void pktmover_init(
     const char *netif, const char *macaddr,
-    eth_rx_handler_t rxh, eth_rx_status_t rxstat,
-    bx_devmodel_c *dev, const char *script);
+    eth_rx_handler_t rxh, bx_devmodel_c *dev, const char *script);
   void sendpkt(void *buf, unsigned io_len);
 private:
   void guest_to_host(const Bit8u *buf, unsigned io_len);
@@ -191,9 +190,7 @@ private:
 
   static void rx_timer_handler(void *);
   void rx_timer(void);
-
   int rx_timer_index;
-  unsigned netdev_speed;
   unsigned tx_time;
 
 #if BX_ETH_VNET_LOGGING
@@ -212,11 +209,11 @@ public:
 protected:
   eth_pktmover_c *allocate(
       const char *netif, const char *macaddr,
-      eth_rx_handler_t rxh, eth_rx_status_t rxstat,
+      eth_rx_handler_t rxh,
       bx_devmodel_c *dev, const char *script) {
     bx_vnet_pktmover_c *pktmover;
     pktmover = new bx_vnet_pktmover_c();
-    pktmover->pktmover_init(netif, macaddr, rxh, rxstat, dev, script);
+    pktmover->pktmover_init(netif, macaddr, rxh, dev, script);
     return pktmover;
   }
 } bx_vnet_match;
@@ -250,13 +247,11 @@ bx_vnet_pktmover_c::bx_vnet_pktmover_c()
 
 void bx_vnet_pktmover_c::pktmover_init(
   const char *netif, const char *macaddr,
-  eth_rx_handler_t rxh, eth_rx_status_t rxstat,
-  bx_devmodel_c *dev, const char *script)
+  eth_rx_handler_t rxh, bx_devmodel_c *dev, const char *script)
 {
   this->netdev = dev;
   BX_INFO(("vnet network driver"));
-  this->rxh    = rxh;
-  this->rxstat = rxstat;
+  this->rxh   = rxh;
   strcpy(this->tftp_rootdir, netif);
   this->tftp_tid = 0;
   this->tftp_write = 0;
@@ -275,9 +270,6 @@ void bx_vnet_pktmover_c::pktmover_init(
   register_layer4_handler(0x11,INET_PORT_BOOTP_SERVER,udpipv4_dhcp_handler);
   register_layer4_handler(0x11,INET_PORT_TFTP_SERVER,udpipv4_tftp_handler);
 
-  Bit32u status = this->rxstat(this->netdev) & BX_NETDEV_SPEED;
-  this->netdev_speed = (status == BX_NETDEV_1GBIT) ? 1000 :
-                       (status == BX_NETDEV_100MBIT) ? 100 : 10;
   this->rx_timer_index =
     bx_pc_system.register_timer(this, this->rx_timer_handler, 1000,
                               	 0, 0, "eth_vnet");
@@ -326,7 +318,7 @@ void bx_vnet_pktmover_c::guest_to_host(const Bit8u *buf, unsigned io_len)
   }
 #endif
 
-  this->tx_time = (64 + 96 + 4 * 8 + io_len * 8) / this->netdev_speed;
+  this->tx_time = (64 + 96 + 4 * 8 + io_len * 8) / 10;
   if ((io_len >= 14) &&
       (!memcmp(&buf[6],&dhcp.guest_macaddr[0],6)) &&
       (!memcmp(&buf[0],&dhcp.host_macaddr[0],6) ||
@@ -354,25 +346,21 @@ void bx_vnet_pktmover_c::rx_timer_handler(void *this_ptr)
 
 void bx_vnet_pktmover_c::rx_timer(void)
 {
-  if (this->rxstat(this->netdev) & BX_NETDEV_RXREADY) {
-    this->rxh(this->netdev, (void *)packet_buffer, packet_len);
+  this->rxh(this->netdev, (void *)packet_buffer, packet_len);
 #if BX_ETH_VNET_LOGGING
-    write_pktlog_txt(pktlog_txt, packet_buffer, packet_len, 1);
+  write_pktlog_txt(pktlog_txt, packet_buffer, packet_len, 1);
 #endif
 #if BX_ETH_VNET_PCAP_LOGGING
-    if (pktlog_pcap && !ferror((FILE *)pktlog_pcap)) {
-      Bit64u time = bx_pc_system.time_usec();
-      pcaphdr.ts.tv_usec = time % 1000000;
-      pcaphdr.ts.tv_sec = time / 1000000;
-      pcaphdr.caplen = packet_len;
-      pcaphdr.len = packet_len;
-      pcap_dump((u_char *)pktlog_pcap, &pcaphdr, packet_buffer);
-      fflush((FILE *)pktlog_pcap);
-    }
-#endif
-  } else {
-    BX_ERROR(("device not ready to receive data"));
+  if (pktlog_pcap && !ferror((FILE *)pktlog_pcap)) {
+    Bit64u time = bx_pc_system.time_usec();
+    pcaphdr.ts.tv_usec = time % 1000000;
+    pcaphdr.ts.tv_sec = time / 1000000;
+    pcaphdr.caplen = packet_len;
+    pcaphdr.len = packet_len;
+    pcap_dump((u_char *)pktlog_pcap, &pcaphdr, packet_buffer);
+    fflush((FILE *)pktlog_pcap);
   }
+#endif
 }
 
 void bx_vnet_pktmover_c::host_to_guest(Bit8u *buf, unsigned io_len)
@@ -393,7 +381,7 @@ void bx_vnet_pktmover_c::host_to_guest(Bit8u *buf, unsigned io_len)
 
   packet_len = io_len;
   memcpy(&packet_buffer, &buf[0], io_len);
-  unsigned rx_time = (64 + 96 + 4 * 8 + io_len * 8) / this->netdev_speed;
+  unsigned rx_time = (64 + 96 + 4 * 8 + io_len * 8) / 10;
   bx_pc_system.activate_timer(this->rx_timer_index, this->tx_time + rx_time + 100, 0);
 }
 

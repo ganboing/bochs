@@ -428,11 +428,6 @@ enum {
 #define BX_MSR_KERNELGSBASE     0xc0000102
 #define BX_MSR_TSC_AUX          0xc0000103
 
-#define BX_SVM_VM_CR_MSR        0xc0010114
-#define BX_SVM_IGNNE_MSR        0xc0010115
-#define BX_SVM_SMM_CTL_MSR      0xc0010116
-#define BX_SVM_HSAVE_PA_MSR     0xc0010117
-
 #define BX_MODE_IA32_REAL       0x0   // CR0.PE=0                |
 #define BX_MODE_IA32_V8086      0x1   // CR0.PE=1, EFLAGS.VM=1   | EFER.LMA=0
 #define BX_MODE_IA32_PROTECTED  0x2   // CR0.PE=1, EFLAGS.VM=0   |
@@ -649,6 +644,13 @@ typedef struct
   Bit32u tsc_aux;
 #endif
 
+  // TSC: Time Stamp Counter
+  // Instead of storing a counter and incrementing it every instruction, we
+  // remember the time in ticks that it was reset to zero.  With a little
+  // algebra, we can also support setting it to something other than zero.
+  // Don't read this directly; use get_TSC and set_TSC to access the TSC.
+  Bit64u tsc_last_reset;
+
 #if BX_CPU_LEVEL >= 6
   // SYSENTER/SYSEXIT instruction msr's
   Bit32u sysenter_cs_msr;
@@ -665,10 +667,6 @@ typedef struct
 
 #if BX_SUPPORT_VMX
   Bit32u ia32_feature_ctrl;
-#endif
-
-#if BX_SUPPORT_SVM
-  Bit64u svm_hsave_pa;
 #endif
 
   /* TODO finish of the others */
@@ -828,10 +826,6 @@ typedef struct {
 #include "vmx.h"
 #endif
 
-#if BX_SUPPORT_SVM
-#include "svm.h"
-#endif
-
 #if BX_SUPPORT_MONITOR_MWAIT
 struct monitor_addr_t {
 
@@ -865,9 +859,6 @@ public: // for now...
 #if BX_SUPPORT_VMX
   Bit32u vmx_extensions_bitmask;
 #endif
-#if BX_SUPPORT_SVM
-  Bit32u svm_extensions_bitmask;
-#endif
 
 #define BX_CPUID_SUPPORT_ISA_EXTENSION(feature) \
    (BX_CPU_THIS_PTR isa_extensions_bitmask & (feature))
@@ -877,9 +868,6 @@ public: // for now...
 
 #define BX_SUPPORT_VMX_EXTENSION(feature) \
    (BX_CPU_THIS_PTR vmx_extensions_bitmask & (feature))
-
-#define BX_SUPPORT_SVM_EXTENSION(feature) \
-   (BX_CPU_THIS_PTR svm_extensions_bitmask & (feature))
 
   // General register set
   // rax: accumulator
@@ -916,19 +904,24 @@ public: // for now...
   bx_address prev_rsp;
   bx_bool    speculative_rsp;
 
+#if BX_DEBUGGER || BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
   Bit64u icount;
   Bit64u icount_last_sync;
+#endif
 
 #define BX_INHIBIT_INTERRUPTS        0x01
 #define BX_INHIBIT_DEBUG             0x02
+#define BX_INHIBIT_INTERRUPTS_SHADOW 0x04
+#define BX_INHIBIT_DEBUG_SHADOW      0x08
 
 #define BX_INHIBIT_INTERRUPTS_BY_MOVSS        \
     (BX_INHIBIT_INTERRUPTS | BX_INHIBIT_DEBUG)
+#define BX_INHIBIT_INTERRUPTS_BY_MOVSS_SHADOW \
+    (BX_INHIBIT_INTERRUPTS_SHADOW | BX_INHIBIT_DEBUG_SHADOW)
 
   // What events to inhibit at any given time.  Certain instructions
   // inhibit interrupts, some debug exceptions and single-step traps.
   unsigned inhibit_mask;
-  Bit64u inhibit_icount;
 
   /* user segment register set */
   bx_segment_reg_t  sregs[6];
@@ -953,21 +946,11 @@ public: // for now...
 #if BX_CPU_LEVEL >= 5
   bx_cr4_t   cr4;
   Bit32u cr4_suppmask;
-
-  bx_efer_t efer;
-  Bit32u efer_suppmask;
 #endif
 
 #if BX_CPU_LEVEL >= 5
-  // TSC: Time Stamp Counter
-  // Instead of storing a counter and incrementing it every instruction, we
-  // remember the time in ticks that it was reset to zero.  With a little
-  // algebra, we can also support setting it to something other than zero.
-  // Don't read this directly; use get_TSC and set_TSC to access the TSC.
-  Bit64u tsc_last_reset;
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  Bit64s tsc_offset;
-#endif
+  bx_efer_t efer;
+  Bit32u efer_suppmask;
 #endif
 
 #if BX_CPU_LEVEL >= 6
@@ -1009,6 +992,7 @@ public: // for now...
 #endif
 
 #if BX_SUPPORT_VMX
+  bx_bool in_event;
   bx_bool in_vmx;
   bx_bool in_vmx_guest;
   bx_bool in_smm_vmx; // save in_vmx and in_vmx_guest flags when in SMM mode
@@ -1023,26 +1007,6 @@ public: // for now...
   
   VMCS_CACHE vmcs;
   VMX_CAP vmx_cap;
-#endif
-
-#if BX_SUPPORT_SVM
-  bx_bool in_svm_guest;
-  bx_bool svm_gif; /* global interrupt enable flag, when zero all external interrupt disabled */
-  bx_phy_address  vmcbptr;
-  bx_hostpageaddr_t vmcbhostptr;
-  VMCB_CACHE vmcb;
-
-// make SVM integration easier
-#define SVM_GIF (BX_CPU_THIS_PTR svm_gif)
-
-#else
-
-#define SVM_GIF (1)
-
-#endif
-
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  bx_bool in_event;
 #endif
 
   bx_bool EXT; /* 1 if processing external interrupt or exception
@@ -2582,17 +2546,6 @@ public: // for now...
   BX_SMF BX_INSF_TYPE VMFUNC(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
   /* VMX instructions */
 
-  /* SVM instructions */
-  BX_SMF BX_INSF_TYPE VMRUN(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE VMMCALL(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE VMLOAD(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE VMSAVE(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE SKINIT(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE CLGI(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE STGI(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  BX_SMF BX_INSF_TYPE INVLPGA(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
-  /* SVM instructions */
-
   /* SMX instructions */
   BX_SMF BX_INSF_TYPE GETSEC(bxInstruction_c *) BX_CPP_AttrRegparmN(1);
   /* SMX instructions */
@@ -3554,10 +3507,7 @@ public: // for now...
 #if BX_SUPPORT_SMP
   BX_SMF void cpu_run_trace(void);
 #endif
-  BX_SMF bx_bool handleAsyncEvent(void);
-  BX_SMF bx_bool handleWaitForEvent(void);
-  BX_SMF bx_bool interrupts_enabled(void);
-  BX_SMF void InterruptAcknowledge(void);
+  BX_SMF unsigned handleAsyncEvent(void);
 
   BX_SMF int fetchDecode32(const Bit8u *fetchPtr, bxInstruction_c *i, unsigned remainingInPage) BX_CPP_AttrRegparmN(3);
 #if BX_SUPPORT_X86_64
@@ -3903,8 +3853,6 @@ public: // for now...
   BX_SMF void TLB_flush(void);
   BX_SMF void TLB_invlpg(bx_address laddr);
   BX_SMF void set_INTR(bx_bool value);
-  BX_SMF void inhibit_interrupts(unsigned mask);
-  BX_SMF bx_bool interrupts_inhibited(unsigned mask);
   BX_SMF const char *strseg(bx_segment_reg_t *seg);
   BX_SMF void interrupt(Bit8u vector, unsigned type, bx_bool push_error,
                  Bit16u error_code);
@@ -4076,14 +4024,14 @@ public: // for now...
   BX_SMF BX_CPP_INLINE int bx_cpuid_support_x2apic(void);
   BX_SMF BX_CPP_INLINE int bx_cpuid_support_smx(void);
   BX_SMF BX_CPP_INLINE int bx_cpuid_support_vmx(void);
-  BX_SMF BX_CPP_INLINE int bx_cpuid_support_svm(void);
   BX_SMF BX_CPP_INLINE int bx_cpuid_support_rdtscp(void);
   BX_SMF BX_CPP_INLINE int bx_cpuid_support_tsc_deadline(void);
-  BX_SMF BX_CPP_INLINE int bx_cpuid_support_xapic_extensions(void);
 
   BX_SMF BX_CPP_INLINE unsigned which_cpu(void) { return BX_CPU_THIS_PTR bx_cpuid; }
+#if BX_DEBUGGER || BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
   BX_SMF BX_CPP_INLINE Bit64u get_icount(void) { return BX_CPU_THIS_PTR icount; }
   BX_SMF BX_CPP_INLINE Bit64u get_icount_last_sync(void) { return BX_CPU_THIS_PTR icount_last_sync; }
+#endif
   BX_SMF BX_CPP_INLINE const bx_gen_reg_t *get_gen_regfile() { return BX_CPU_THIS_PTR gen_reg; }
 
   BX_SMF BX_CPP_INLINE bx_address get_instruction_pointer(void);
@@ -4233,6 +4181,7 @@ public: // for now...
   BX_SMF Bit32u VMX_Read_VTPR(void);
   BX_SMF void VMX_Write_VTPR(Bit8u vtpr);
 #endif
+  BX_SMF Bit64s VMX_TSC_Offset(void);
   // vmexit reasons
   BX_SMF void VMexit_Instruction(bxInstruction_c *i, Bit32u reason) BX_CPP_AttrRegparmN(2);
   BX_SMF void VMexit_Event(bxInstruction_c *i, unsigned type, unsigned vector,
@@ -4267,32 +4216,6 @@ public: // for now...
 #if BX_SUPPORT_VMX >= 2
   BX_SMF void vmfunc_eptp_switching(bxInstruction_c *i) BX_CPP_AttrRegparmN(1);
 #endif
-#endif
-
-#if BX_SUPPORT_SVM
-  BX_SMF void SvmEnterSaveHostState(SVM_HOST_STATE *host);
-  BX_SMF bx_bool SvmEnterLoadCheckControls(SVM_CONTROLS *ctrls);
-  BX_SMF bx_bool SvmEnterLoadCheckGuestState(void);
-  BX_SMF bx_bool SvmInjectEvents(void);
-  BX_SMF void Svm_Vmexit(int reason);
-  BX_SMF void SvmExitSaveGuestState(void);
-  BX_SMF void SvmExitLoadHostState(SVM_HOST_STATE *host);
-  BX_SMF Bit8u vmcb_read8(unsigned offset);
-  BX_SMF Bit16u vmcb_read16(unsigned offset);
-  BX_SMF Bit32u vmcb_read32(unsigned offset);
-  BX_SMF Bit64u vmcb_read64(unsigned offset);
-  BX_SMF void vmcb_write8(unsigned offset, Bit8u val_8);
-  BX_SMF void vmcb_write16(unsigned offset, Bit16u val_16);
-  BX_SMF void vmcb_write32(unsigned offset, Bit32u val_32);
-  BX_SMF void vmcb_write64(unsigned offset, Bit64u val_64);
-  BX_SMF void svm_segment_read(bx_segment_reg_t *seg, unsigned offset);
-  BX_SMF void svm_segment_write(bx_segment_reg_t *seg, unsigned offset);
-  BX_SMF void SvmInterceptException(unsigned type, unsigned vector,
-       Bit16u errcode, bx_bool errcode_valid, Bit64u qualification = 0);
-  BX_SMF void SvmInterceptIO(bxInstruction_c *i, unsigned port, unsigned len);
-  BX_SMF void SvmInterceptMSR(unsigned op, Bit32u msr);
-  BX_SMF void VirtualInterruptAcknowledge(void);
-  BX_SMF void register_svm_state(bx_param_c *parent);
 #endif
 
 #if BX_CONFIGURE_MSRS
@@ -4542,35 +4465,30 @@ BX_CPP_INLINE bx_bool BX_CPU_C::alignment_check(void)
 }
 #endif
 
-BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_svm(void)
-{
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SVM) != 0;
-}
-
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_smx(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SMX) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SMX);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_vmx(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_VMX) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_VMX);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_xsave(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_XSAVE) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_XSAVE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_x2apic(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_X2APIC) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_X2APIC);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_pcid(void)
 {
 #if BX_SUPPORT_X86_64
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PCID) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PCID);
 #else
   return 0;
 #endif
@@ -4579,7 +4497,7 @@ BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_pcid(void)
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_fsgsbase(void)
 {
 #if BX_SUPPORT_X86_64
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_FSGSBASE) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_FSGSBASE);
 #else
   return 0;
 #endif
@@ -4587,63 +4505,63 @@ BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_fsgsbase(void)
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_smep(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_SMEP) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_SMEP);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_vme(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_VME) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_VME);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_tsc(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_PENTIUM) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_PENTIUM);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_debug_extensions(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_DEBUG_EXTENSIONS) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_DEBUG_EXTENSIONS);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_pse(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PSE) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PSE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_pae(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PAE) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PAE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_pge(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PGE) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_PGE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_mmx(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_MMX) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_MMX);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_sse(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SSE) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SSE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_sep(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SYSENTER_SYSEXIT) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SYSENTER_SYSEXIT);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_fxsave_fxrstor(void)
 {
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SSE) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_SSE);
 }
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_x86_64(void)
 {
 #if BX_SUPPORT_X86_64
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_LONG_MODE) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_LONG_MODE);
 #else
   return 0;
 #endif
@@ -4652,7 +4570,7 @@ BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_x86_64(void)
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_1g_paging(void)
 {
 #if BX_SUPPORT_X86_64
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_1G_PAGES) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_1G_PAGES);
 #else
   return 0;
 #endif
@@ -4661,7 +4579,7 @@ BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_1g_paging(void)
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_rdtscp(void)
 {
 #if BX_SUPPORT_X86_64
-  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_RDTSCP) != 0;
+  return (BX_CPU_THIS_PTR isa_extensions_bitmask & BX_ISA_RDTSCP);
 #else
   return 0;
 #endif
@@ -4669,12 +4587,7 @@ BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_rdtscp(void)
 
 BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_tsc_deadline(void)
 {
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_TSC_DEADLINE) != 0;
-}
-
-BX_CPP_INLINE int BX_CPU_C::bx_cpuid_support_xapic_extensions(void)
-{
-  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_XAPIC_EXT) != 0;
+  return (BX_CPU_THIS_PTR cpu_extensions_bitmask & BX_CPU_TSC_DEADLINE);
 }
 
 IMPLEMENT_EFLAG_ACCESSOR   (ID,  21)
@@ -4716,7 +4629,7 @@ enum {
   BX_HARDWARE_EXCEPTION = 3,  // all exceptions except #BP and #OF
   BX_SOFTWARE_INTERRUPT = 4,
   BX_PRIVILEGED_SOFTWARE_INTERRUPT = 5,
-  BX_SOFTWARE_EXCEPTION = 6
+  BX_SOFTWARE_EXCEPTION = 6   // they are software exceptions
 };
 
 #if BX_CPU_LEVEL >= 6

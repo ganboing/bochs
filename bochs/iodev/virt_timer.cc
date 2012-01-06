@@ -117,7 +117,7 @@ bx_virt_timer_c bx_virt_timer;
 
 bx_virt_timer_c::bx_virt_timer_c()
 {
-  put("virt_timer", "VTIME");
+  put("VTIME");
 
   setup();
 }

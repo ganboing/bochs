@@ -55,7 +55,6 @@ typedef struct {
 
   Bit8u devfunc;
 
-  int statusbar_id;
 } bx_pnic_t;
 
 
@@ -79,9 +78,6 @@ private:
   static void pnic_timer_handler(void *);
   void pnic_timer(void);
 
-  BX_PNIC_SMF bx_bool mem_read_handler(bx_phy_address addr, unsigned len, void *data, void *param);
-  BX_PNIC_SMF bx_bool mem_write_handler(bx_phy_address addr, unsigned len, void *data, void *param);
-
   static Bit32u read_handler(void *this_ptr, Bit32u address, unsigned io_len);
   static void   write_handler(void *this_ptr, Bit32u address, Bit32u value, unsigned io_len);
 #if !BX_USE_PCIPNIC_SMF
@@ -91,9 +87,6 @@ private:
 
   eth_pktmover_c *ethdev;
   static void exec_command(void);
-
-  static Bit32u rx_status_handler(void *arg);
-  BX_PNIC_SMF Bit32u rx_status(void);
   static void rx_handler(void *arg, const void *buf, unsigned len);
   BX_PNIC_SMF void rx_frame(const void *buf, unsigned io_len);
 };

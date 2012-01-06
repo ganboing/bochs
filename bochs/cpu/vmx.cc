@@ -324,6 +324,7 @@ VMX_error_code BX_CPU_C::VMenterLoadCheckVmControls(void)
   vm->vm_exceptions_bitmap = VMread32(VMCS_32BIT_CONTROL_EXECUTION_BITMAP);
   vm->vm_pf_mask = VMread32(VMCS_32BIT_CONTROL_PAGE_FAULT_ERR_CODE_MASK);
   vm->vm_pf_match = VMread32(VMCS_32BIT_CONTROL_PAGE_FAULT_ERR_CODE_MATCH);
+  vm->tsc_offset = VMread64(VMCS_64BIT_CONTROL_TSC_OFFSET);
   vm->vm_cr0_mask = VMread_natural(VMCS_CONTROL_CR0_GUEST_HOST_MASK);
   vm->vm_cr4_mask = VMread_natural(VMCS_CONTROL_CR4_GUEST_HOST_MASK);
   vm->vm_cr0_read_shadow = VMread_natural(VMCS_CONTROL_CR0_READ_SHADOW);
@@ -1473,7 +1474,7 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
 
       if (! CheckPDPTR(guest.pdptr)) {
          *qualification = VMENTER_ERR_GUEST_STATE_PDPTR_LOADING;
-         BX_ERROR(("VMENTER: EPT Guest State PDPTRs Checks Failed"));
+         BX_ERROR(("VMENTER: Guest State PDPTRs Checks Failed"));
          return VMX_VMEXIT_VMENTRY_FAILURE_GUEST_STATE;
       }
     }
@@ -1511,7 +1512,8 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
 // keep bits ET(4), reserved bits 15:6, 17, 28:19, NW(29), CD(30)
 #define VMX_KEEP_CR0_BITS 0x7FFAFFD0
 
-  guest.cr0 = (BX_CPU_THIS_PTR cr0.get32() & VMX_KEEP_CR0_BITS) | (guest.cr0 & ~VMX_KEEP_CR0_BITS);
+  Bit32u old_cr0 = BX_CPU_THIS_PTR cr0.get32();
+  guest.cr0 = (old_cr0 & VMX_KEEP_CR0_BITS) | (guest.cr0 & ~VMX_KEEP_CR0_BITS);
 
   if (! check_CR0(guest.cr0)) {
     BX_PANIC(("VMENTER CR0 is broken !"));
@@ -1547,9 +1549,10 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
   RIP = BX_CPU_THIS_PTR prev_rip = guest.rip;
   RSP = guest.rsp;
 
-  BX_CPU_THIS_PTR async_event = 0;
-
-  setEFlags((Bit32u) guest.rflags);
+  // set flags directly, avoid setEFlags side effects
+  BX_CPU_THIS_PTR eflags = (Bit32u) guest.rflags;
+  // Update lazy flags state
+  setEFlagsOSZAPC((Bit32u) guest.rflags);
 
 #ifdef BX_SUPPORT_CS_LIMIT_DEMOTION
   // Handle special case of CS.LIMIT demotion (new descriptor limit is
@@ -1560,6 +1563,13 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
   
   for(unsigned segreg=0; segreg<6; segreg++)
     BX_CPU_THIS_PTR sregs[segreg] = guest.sregs[segreg];
+
+  if (v8086_guest) CPL = 3;
+#if BX_SUPPORT_VMX >= 2
+  else {
+    if (real_mode_guest) CPL = 0;
+  }
+#endif
 
   BX_CPU_THIS_PTR gdtr.base = gdtr_base;
   BX_CPU_THIS_PTR gdtr.limit = gdtr_limit;
@@ -1584,6 +1594,10 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
   // Load Guest Non-Registers State -> VMENTER
   //
 
+  BX_CPU_THIS_PTR async_event = 0;
+  if (guest.rflags & EFlagsTFMask)
+    BX_CPU_THIS_PTR async_event = 1;
+
   if (vm->vmentry_ctrls & VMX_VMENTRY_CTRL1_SMM_ENTER)
     BX_PANIC(("VMENTER: entry to SMM is not implemented yet !"));
 
@@ -1601,12 +1615,14 @@ Bit32u BX_CPU_C::VMenterLoadCheckGuestState(Bit64u *qualification)
       BX_CPU_THIS_PTR async_event = 1;
 
     if (guest.interruptibility_state & BX_VMX_INTERRUPTS_BLOCKED_BY_STI)
-      inhibit_interrupts(BX_INHIBIT_INTERRUPTS);
+      BX_CPU_THIS_PTR inhibit_mask = BX_INHIBIT_INTERRUPTS;
     else if (guest.interruptibility_state & BX_VMX_INTERRUPTS_BLOCKED_BY_MOV_SS)
-      inhibit_interrupts(BX_INHIBIT_INTERRUPTS_BY_MOVSS);
-    else
-      BX_CPU_THIS_PTR inhibit_mask = 0;
+      BX_CPU_THIS_PTR inhibit_mask = BX_INHIBIT_INTERRUPTS | BX_INHIBIT_DEBUG;
+    else BX_CPU_THIS_PTR inhibit_mask = 0;
   }
+
+  if (BX_CPU_THIS_PTR inhibit_mask)
+    BX_CPU_THIS_PTR async_event = 1;
 
   if (guest.interruptibility_state & BX_VMX_INTERRUPTS_BLOCKED_NMI_BLOCKED) {
     BX_CPU_THIS_PTR disable_NMI = 1;
@@ -1679,7 +1695,7 @@ void BX_CPU_C::VMenterInjectEvents(void)
   if (is_INT)
     RIP += vm->vmentry_instr_length;
 
-  BX_DEBUG(("VMENTER: Injecting vector 0x%02x (error_code 0x%04x)", vector, error_code));
+  BX_ERROR(("VMENTER: Injecting vector 0x%02x (error_code 0x%04x)", vector, error_code));
 
   if (type == BX_HARDWARE_EXCEPTION) {
     // record exception the same way as BX_CPU_C::exception does
@@ -1872,8 +1888,8 @@ void BX_CPU_C::VMexitSaveGuestState(void)
   VMwrite_natural(VMCS_GUEST_PENDING_DBG_EXCEPTIONS, tmpDR6 & 0x0000500f);
   
   Bit32u interruptibility_state = 0;
-  if (interrupts_inhibited(BX_INHIBIT_INTERRUPTS)) {
-     if (interrupts_inhibited(BX_INHIBIT_DEBUG))
+  if (BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_INTERRUPTS_SHADOW) {
+     if (BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_DEBUG_SHADOW)
         interruptibility_state |= BX_VMX_INTERRUPTS_BLOCKED_BY_MOV_SS;
      else
         interruptibility_state |= BX_VMX_INTERRUPTS_BLOCKED_BY_STI;
@@ -1911,8 +1927,6 @@ void BX_CPU_C::VMexitLoadHostState(void)
   bx_bool x86_64_host = 0;
   Bit32u vmexit_ctrls = BX_CPU_THIS_PTR vmcs.vmexit_ctrls;
 
-  BX_CPU_THIS_PTR tsc_offset = 0;
-
 #if BX_SUPPORT_X86_64
   if (vmexit_ctrls & VMX_VMEXIT_CTRL1_HOST_ADDR_SPACE_SIZE) {
      BX_DEBUG(("VMEXIT to x86-64 host"));
@@ -1934,8 +1948,10 @@ void BX_CPU_C::VMexitLoadHostState(void)
   }
 #endif
 
+  Bit32u old_cr0 = BX_CPU_THIS_PTR cr0.get32();
+
   // ET, CD, NW, 28:19, 17, 15:6, and VMX fixed bits not modified Section 19.8
-  host_state->cr0 = (BX_CPU_THIS_PTR cr0.get32() & VMX_KEEP_CR0_BITS) | (host_state->cr0 & ~VMX_KEEP_CR0_BITS);
+  host_state->cr0 = (old_cr0 & VMX_KEEP_CR0_BITS) | (host_state->cr0 & ~VMX_KEEP_CR0_BITS);
 
   if (! check_CR0(host_state->cr0)) {
     BX_PANIC(("VMEXIT CR0 is broken !"));
@@ -2378,11 +2394,11 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::VMLAUNCH(bxInstruction_c *i)
 
   unsigned vmlaunch = 0;
   if ((i->getIaOpcode() == BX_IA_VMLAUNCH)) {
-    BX_DEBUG(("VMLAUNCH VMCS ptr: 0x" FMT_ADDRX64, BX_CPU_THIS_PTR vmcsptr));
+    BX_INFO(("VMLAUNCH VMCS ptr: 0x" FMT_ADDRX64, BX_CPU_THIS_PTR vmcsptr));
     vmlaunch = 1;
   }
   else {
-    BX_DEBUG(("VMRESUME VMCS ptr: 0x" FMT_ADDRX64, BX_CPU_THIS_PTR vmcsptr));
+    BX_INFO(("VMRESUME VMCS ptr: 0x" FMT_ADDRX64, BX_CPU_THIS_PTR vmcsptr));
   }
 
   if (BX_CPU_THIS_PTR in_vmx_guest) {
@@ -2401,7 +2417,7 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::VMLAUNCH(bxInstruction_c *i)
     BX_NEXT_TRACE(i);
   }
 
-  if (interrupts_inhibited(BX_INHIBIT_INTERRUPTS_BY_MOVSS)) {
+  if ((BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_INTERRUPTS_BY_MOVSS_SHADOW) == BX_INHIBIT_INTERRUPTS_BY_MOVSS_SHADOW) {
     BX_ERROR(("VMFAIL: VMLAUNCH with interrupts blocked by MOV_SS !"));
     VMfail(VMXERR_VMENTRY_MOV_SS_BLOCKING);
     BX_NEXT_TRACE(i);
@@ -2478,51 +2494,48 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::VMLAUNCH(bxInstruction_c *i)
   }
 
 /*
-   Check settings of VMX controls and host-state area;
-   if invalid settings
-   THEN VMfailValid(VM entry with invalid VMX-control field(s)) or
-        VMfailValid(VM entry with invalid host-state field(s)) or
-        VMfailValid(VM entry with invalid executive-VMCS pointer)) or
-        VMfailValid(VM entry with non-launched executive VMCS) or
-        VMfailValid(VM entry with executive-VMCS pointer not VMXON pointer)
-        VMfailValid(VM entry with invalid VM-execution control fields in executive VMCS)
-   (as appropriate);
-   else
-        Attempt to load guest state and PDPTRs as appropriate;
-        clear address-range monitoring;
-        if failure in checking guest state or PDPTRs
-        	THEN VM entry fails (see Section 22.7, in the IntelR 64 and IA-32 Architectures Software Developer's Manual, Volume 3B);
-        else
-                Attempt to load MSRs from VM-entry MSR-load area;
-                if failure
-                	THEN VM entry fails (see Section 22.7, in the IntelR 64 and IA-32 Architectures Software Developer's Manual, Volume 3B);
-                else {
-                        if VMLAUNCH
-                        	THEN launch state of VMCS <== "launched";
-                                if in SMM and "entry to SMM" VM-entry control is 0
-                                THEN
-                                	if "deactivate dual-monitor treatment" VM-entry control is 0
-                                        	THEN SMM-transfer VMCS pointer <== current-VMCS pointer;
-                                        FI;
-                                        if executive-VMCS pointer is VMX pointer
-                                        	THEN current-VMCS pointer <== VMCS-link pointer;
-                                        else current-VMCS pointer <== executive-VMCS pointer;
+                Check settings of VMX controls and host-state area;
+                if invalid settings
+                THEN VMfailValid(VM entry with invalid VMX-control field(s)) or
+                     VMfailValid(VM entry with invalid host-state field(s)) or
+                     VMfailValid(VM entry with invalid executive-VMCS pointer)) or
+                     VMfailValid(VM entry with non-launched executive VMCS) or
+                     VMfailValid(VM entry with executive-VMCS pointer not VMXON pointer)
+                     VMfailValid(VM entry with invalid VM-execution control fields in executive VMCS)
+                (as appropriate);
+                else
+                        Attempt to load guest state and PDPTRs as appropriate;
+                        clear address-range monitoring;
+                        if failure in checking guest state or PDPTRs
+                                THEN VM entry fails (see Section 22.7, in the
+                                                     IntelR 64 and IA-32 Architectures Software Developer's Manual, Volume 3B);
+                                else
+                                        Attempt to load MSRs from VM-entry MSR-load area;
+                                        if failure
+                                                THEN VM entry fails (see Section 22.7, in the IntelR 64 and IA-32
+                                                                     Architectures Software Developer's Manual, Volume 3B);
+                                        else {
+                                                if VMLAUNCH
+                                                        THEN launch state of VMCS <== "launched";
+                                                if in SMM and "entry to SMM" VM-entry control is 0
+                                                THEN
+                                                                if "deactivate dual-monitor treatment" VM-entry control is 0
+                                                                        THEN SMM-transfer VMCS pointer <== current-VMCS pointer;
+                                                                FI;
+                                                                if executive-VMCS pointer is VMX pointer
+                                                                        THEN current-VMCS pointer <== VMCS-link pointer;
+                                                                        else current-VMCS pointer <== executive-VMCS pointer;
+                                                                FI;
+                                                                leave SMM;
+                                                FI;
+                                                VMsucceed();
+                                        }
                                 FI;
-                                leave SMM;
-                        FI;
-                        VMsucceed();
-                }
-         FI;
-   FI;
+                FI;
 */
 
   BX_CPU_THIS_PTR in_vmx_guest = 1;
   BX_CPU_THIS_PTR disable_INIT = 0;
-
-  if (VMEXIT(VMX_VM_EXEC_CTRL2_TSC_OFFSET))
-    BX_CPU_THIS_PTR tsc_offset = VMread64(VMCS_64BIT_CONTROL_TSC_OFFSET);
-  else
-    BX_CPU_THIS_PTR tsc_offset = 0;
 
 #if BX_SUPPORT_VMX >= 2
   if (PIN_VMEXIT(VMX_VM_EXEC_CTRL1_VMX_PREEMPTION_TIMER_VMEXIT)) {
@@ -3161,6 +3174,7 @@ void BX_CPU_C::register_vmx_state(bx_param_c *parent)
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, vm_pf_match, BX_CPU_THIS_PTR vmcs.vm_pf_match);
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, io_bitmap_addr1, BX_CPU_THIS_PTR vmcs.io_bitmap_addr[0]);
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, io_bitmap_addr2, BX_CPU_THIS_PTR vmcs.io_bitmap_addr[1]);
+  BXRS_HEX_PARAM_FIELD(vmexec_ctrls, tsc_offset, BX_CPU_THIS_PTR vmcs.tsc_offset);
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, msr_bitmap_addr, BX_CPU_THIS_PTR vmcs.msr_bitmap_addr);
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, vm_cr0_mask, BX_CPU_THIS_PTR vmcs.vm_cr0_mask);
   BXRS_HEX_PARAM_FIELD(vmexec_ctrls, vm_cr0_read_shadow, BX_CPU_THIS_PTR vmcs.vm_cr0_read_shadow);

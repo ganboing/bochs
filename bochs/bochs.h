@@ -111,15 +111,12 @@ extern "C" {
 #endif
 
 // prototypes
-int  bx_begin_simulation(int argc, char *argv[]);
+int bx_begin_simulation(int argc, char *argv[]);
 void bx_stop_simulation();
 char *bx_find_bochsrc(void);
-int  bx_parse_cmdline(int arg, int argc, char *argv[]);
-int  bx_read_configuration(const char *rcfile);
-int  bx_write_configuration(const char *rcfile, int overwrite);
-void bx_init_std_nic_options(const char *name, bx_list_c *menu);
-int  bx_write_pci_nic_options(FILE *fp, bx_list_c *base);
-int  bx_parse_nic_params(const char *context, const char *param, bx_list_c *base);
+int bx_parse_cmdline(int arg, int argc, char *argv[]);
+int bx_read_configuration(const char *rcfile);
+int bx_write_configuration(const char *rcfile, int overwrite);
 void bx_reset_options(void);
 Bit32u crc32(const Bit8u *buf, int len);
 // for param-tree testing only
@@ -241,7 +238,6 @@ void print_tree(bx_param_c *node, int level = 0);
 
 typedef class BOCHSAPI logfunctions
 {
-  char *name;
   char *prefix;
 // values of onoff: 0=ignore, 1=report, 2=ask, 3=fatal
 #define ACT_IGNORE 0
@@ -265,15 +261,13 @@ public:
   void ldebug(const char *fmt, ...) BX_CPP_AttrPrintf(2, 3);
   void fatal (const char *prefix, const char *fmt, va_list ap, int exit_status);
   void ask (int level, const char *prefix, const char *fmt, va_list ap);
-  void put(const char *p);
-  void put(const char *n, const char *p);
+  void put(const char *);
   void setio(class iofunctions *);
   void setonoff(int loglev, int value) {
     assert (loglev >= 0 && loglev < N_LOGLEV);
     onoff[loglev] = value;
   }
-  char *get_name() { return name; }
-  char *getprefix() { return prefix; }
+  char *getprefix () { return prefix; }
   int getonoff(int level) {
     assert (level>=0 && level<N_LOGLEV);
     return onoff[level];
@@ -447,8 +441,8 @@ BOCHSAPI extern Bit32u apic_id_mask;
 #define BX_EPT_PDPTE_ACCESS       0x0b0
 #define BX_EPT_PML4E_ACCESS       0x0c0
 #define BX_VMCS_ACCESS            0x0d0
-#define BX_MSR_BITMAP_ACCESS      0x0e0
-#define BX_IO_BITMAP_ACCESS       0x0f0
+#define BX_VMX_MSR_BITMAP_ACCESS  0x0e0
+#define BX_VMX_IO_BITMAP_ACCESS   0x0f0
 #define BX_VMX_LOAD_MSR_ACCESS    0x100
 #define BX_VMX_STORE_MSR_ACCESS   0x110
 #define BX_VMX_VTPR_ACCESS        0x120

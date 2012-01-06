@@ -48,13 +48,12 @@ int libspeaker_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, ch
 
 void libspeaker_LTX_plugin_fini(void)
 {
-  bx_devices.pluginSpeaker = &bx_devices.stubSpeaker;
   delete theSpeaker;
 }
 
 bx_speaker_c::bx_speaker_c()
 {
-  put("speaker", "SPEAK");
+  put("SPEAK");
 
   beep_frequency = 0.0; // Off
 

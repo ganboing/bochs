@@ -92,7 +92,6 @@ public:
   bx_linux_pktmover_c(const char *netif,
                       const char *macaddr,
                       eth_rx_handler_t rxh,
-                      eth_rx_status_t rxstat,
                       bx_devmodel_c *dev,
                       const char *script);
   void sendpkt(void *buf, unsigned io_len);
@@ -119,9 +118,8 @@ protected:
   eth_pktmover_c *allocate(const char *netif,
                            const char *macaddr,
                            eth_rx_handler_t rxh,
-                           eth_rx_status_t rxstat,
                            bx_devmodel_c *dev, const char *script) {
-    return (new bx_linux_pktmover_c(netif, macaddr, rxh, rxstat, dev, script));
+    return (new bx_linux_pktmover_c(netif, macaddr, rxh, dev, script));
   }
 } bx_linux_match;
 
@@ -135,7 +133,6 @@ protected:
 bx_linux_pktmover_c::bx_linux_pktmover_c(const char *netif,
                                          const char *macaddr,
                                          eth_rx_handler_t rxh,
-                                         eth_rx_status_t rxstat,
                                          bx_devmodel_c *dev,
                                          const char *script)
 {
@@ -227,8 +224,7 @@ bx_linux_pktmover_c::bx_linux_pktmover_c(const char *netif,
     bx_pc_system.register_timer(this, this->rx_timer_handler, BX_PACKET_POLL,
                                 1, 1, "eth_linux"); // continuous, active
 
-  this->rxh    = rxh;
-  this->rxstat = rxstat;
+  this->rxh   = rxh;
   BX_INFO(("linux network driver initialized: using interface %s", netif));
 }
 
@@ -281,11 +277,7 @@ bx_linux_pktmover_c::rx_timer(void)
   // let through broadcast, multicast, and our mac address
 //  if ((memcmp(rxbuf, broadcast_macaddr, 6) == 0) || (memcmp(rxbuf, this->linux_macaddr, 6) == 0) || rxbuf[0] & 0x01) {
     BX_DEBUG(("eth_linux: got packet: %d bytes, dst=%x:%x:%x:%x:%x:%x, src=%x:%x:%x:%x:%x:%x\n", nbytes, rxbuf[0], rxbuf[1], rxbuf[2], rxbuf[3], rxbuf[4], rxbuf[5], rxbuf[6], rxbuf[7], rxbuf[8], rxbuf[9], rxbuf[10], rxbuf[11]));
-    if (this->rxstat(this->netdev) & BX_NETDEV_RXREADY) {
-      this->rxh(this->netdev, rxbuf, nbytes);
-    } else {
-      BX_ERROR(("device not ready to receive data"));
-    }
+    (*rxh)(netdev, rxbuf, nbytes);
 //  }
 }
 #endif /* if BX_NETWORKING && BX_NETMOD_LINUX */

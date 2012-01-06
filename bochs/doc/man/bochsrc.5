@@ -1,5 +1,5 @@
 .\"Document Author:  Timothy R. Butler   -   tbutler@uninetsolutions.com"
-.TH bochsrc 5 "24 Dec 2011" "bochsrc" "The Bochs Project"
+.TH bochsrc 5 "30 Dec 2011" "bochsrc" "The Bochs Project"
 .\"SKIP_SECTION"
 .SH NAME
 bochsrc \- Configuration file for Bochs.
@@ -200,7 +200,7 @@ This option exists only if Bochs compiled with BX_CPU_LEVEL >= 5.
 
 apic:
 
-Select APIC configuration (LEGACY/XAPIC/XAPIC_EXT/X2APIC).
+Select APIC configuration (LEGACY/XAPIC/X2APIC).
 This option exists only if Bochs compiled with BX_CPU_LEVEL >= 5.
 
 sep:
@@ -869,7 +869,7 @@ Example:
 This option controls the presence of a PCI chipset in Bochs. Currently it only
 supports the i440FX chipset. You can also specify the devices connected to
 PCI slots. Up to 5 slots are available. These devices are currently supported:
-cirrus, e1000, es1370, ne2k, pcivga, pcidev, pcipnic, usb_ohci and usb_xhci.
+cirrus, es1370, ne2k, pcivga, pcidev, pcipnic, usb_ohci and usb_xhci.
 
 Example:
   pci: enabled=1, chipset=i440fx, slot1=pcivga, slot2=ne2k
@@ -894,8 +894,7 @@ Defines the characteristics of an attached ne2000 isa card :
    mac=MACADDR,
    ethmod=MODULE,
    ethdev=DEVICE,
-   script=SCRIPT,
-   bootrom=BOOTROM
+   script=SCRIPT
 
 .B PROPERTIES FOR ne2k:
 
@@ -945,11 +944,6 @@ This is mainly useful for the tun/tap devices that only exist during
 Bochs execution. The network interface name is supplied to the script
 as first parameter.
 
-BOOTROM:
-The bootrom value is optional, and is the name of the ROM image
-to load. Note that this feature is only implemented for the PCI version of
-the NE2000.
-
 Examples:
   ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, ethmod=fbsd, ethdev=xlo
   ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, ethmod=linux, ethdev=eth0
@@ -958,27 +952,16 @@ Examples:
   ne2k: ioaddr=0x300, irq=9, mac=fe:fd:00:00:00:01, ethmod=tuntap, ethdev=/dev/net/tun0, script=./tunconfig
   ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:01, ethmod=vde, ethdev="/tmp/vde.ctl"
   ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:01, ethmod=vnet, ethdev="c:/temp"
-  ne2k: mac=b0:c4:20:00:00:01, ethmod=slirp, script=/usr/local/bin/slirp, bootrom=ne2k_pci.rom
 
 .TP
 .I "pnic:"
 To support the Bochs/Etherboot pseudo-NIC, Bochs must be compiled with the
 --enable-pnic configure option. It accepts the same syntax (for mac, ethmod,
-ethdev, script, bootrom) and supports the same networking modules as the NE2000
-adapter. In addition to this, it must be assigned to a PCI slot.
+ethdev, script) and supports the same networking modules as the NE2000 adapter.
+In addition to this, it must be assigned to a PCI slot.
 
 Example:
   pnic: enabled=1, mac=b0:c4:20:00:00:00, ethmod=vnet
-
-.TP
-.I "e1000:"
-To support the Intel(R) 82540EM Gigabit Ethernet adapter, Bochs must be compiled
-with the --eanble-e1000 configure option. The E1000 accepts the same syntax
-(for mac, ethmod, ethdev, script, bootrom) and supports the same networking
-modules as the NE2000 adapter. In addition to this, it must be assigned to a PCI slot.
-
-Example:
-  e1000: enabled=1, mac=52:54:00:12:34:56, ethmod=slirp, script=/usr/local/bin/slirp
 
 .TP
 .I "keyboard_mapping:"

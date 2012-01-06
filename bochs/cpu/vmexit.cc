@@ -185,6 +185,17 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::VMexit_INVLPG(bxInstruction_c *i, bx_addre
   }
 }
 
+Bit64s BX_CPU_C::VMX_TSC_Offset(void)
+{
+  BX_ASSERT(BX_CPU_THIS_PTR in_vmx_guest);
+
+  if (VMEXIT(VMX_VM_EXEC_CTRL2_TSC_OFFSET))
+    return (Bit64s) BX_CPU_THIS_PTR vmcs.tsc_offset;
+  else
+    return 0;
+}
+
+
 void BX_CPP_AttrRegparmN(1) BX_CPU_C::VMexit_RDTSC(bxInstruction_c *i)
 {
   BX_ASSERT(BX_CPU_THIS_PTR in_vmx_guest);
@@ -384,7 +395,7 @@ void BX_CPP_AttrRegparmN(3) BX_CPU_C::VMexit_MSR(bxInstruction_c *i, unsigned op
          // check MSR-HI bitmaps
          bx_phy_address pAddr = vm->msr_bitmap_addr + (msr >> 3) + 1024 + ((op == VMX_VMEXIT_RDMSR) ? 0 : 2048);
          access_read_physical(pAddr, 1, &field);
-         BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_MSR_BITMAP_ACCESS | BX_READ, &field);
+         BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_MSR_BITMAP_ACCESS | BX_READ, &field);
          if (field & (1 << (msr & 7)))
             vmexit = 1;
        }
@@ -395,7 +406,7 @@ void BX_CPP_AttrRegparmN(3) BX_CPU_C::VMexit_MSR(bxInstruction_c *i, unsigned op
          // check MSR-LO bitmaps
          bx_phy_address pAddr = vm->msr_bitmap_addr + (msr >> 3) + ((op == VMX_VMEXIT_RDMSR) ? 0 : 2048);
          access_read_physical(pAddr, 1, &field);
-         BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_MSR_BITMAP_ACCESS | BX_READ, &field);
+         BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_MSR_BITMAP_ACCESS | BX_READ, &field);
          if (field & (1 << (msr & 7)))
             vmexit = 1;
        }
@@ -418,7 +429,7 @@ void BX_CPP_AttrRegparmN(3) BX_CPU_C::VMexit_IO(bxInstruction_c *i, unsigned por
   BX_ASSERT(BX_CPU_THIS_PTR in_vmx_guest);
   BX_ASSERT(port <= 0xFFFF);
 
-  bool vmexit = 0;
+  bx_bool vmexit = 0;
 
   if (VMEXIT(VMX_VM_EXEC_CTRL2_IO_BITMAPS)) {
      // always VMEXIT on port "wrap around" case
@@ -431,21 +442,21 @@ void BX_CPP_AttrRegparmN(3) BX_CPU_C::VMexit_IO(bxInstruction_c *i, unsigned por
           // special case - the IO access split cross both I/O bitmaps
           pAddr = BX_CPU_THIS_PTR vmcs.io_bitmap_addr[0] + 0xfff;
           access_read_physical(pAddr, 1, &bitmap[0]);
-          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_IO_BITMAP_ACCESS | BX_READ, &bitmap[0]);
+          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_IO_BITMAP_ACCESS | BX_READ, &bitmap[0]);
 
           pAddr = BX_CPU_THIS_PTR vmcs.io_bitmap_addr[1];
           access_read_physical(pAddr, 1, &bitmap[1]);
-          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_IO_BITMAP_ACCESS | BX_READ, &bitmap[1]);
+          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_IO_BITMAP_ACCESS | BX_READ, &bitmap[1]);
         }
         else {
           // access_read_physical cannot read 2 bytes cross 4K boundary :(
           pAddr = BX_CPU_THIS_PTR vmcs.io_bitmap_addr[(port >> 15) & 1] + ((port & 0x7fff) / 8);
           access_read_physical(pAddr, 1, &bitmap[0]);
-          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_IO_BITMAP_ACCESS | BX_READ, &bitmap[0]);
+          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_IO_BITMAP_ACCESS | BX_READ, &bitmap[0]);
 
           pAddr++;
           access_read_physical(pAddr, 1, &bitmap[1]);
-          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_IO_BITMAP_ACCESS | BX_READ, &bitmap[1]);
+          BX_DBG_PHY_MEMORY_ACCESS(BX_CPU_ID, pAddr, 1, BX_VMX_IO_BITMAP_ACCESS | BX_READ, &bitmap[1]);
         }
 
         Bit16u combined_bitmap = bitmap[1];
@@ -744,8 +755,8 @@ void BX_CPU_C::VMX_Write_VTPR(Bit8u vtpr)
 // apic virtualization
 bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::is_virtual_apic_page(bx_phy_address paddr)
 {
+  VMCS_CACHE *vm = &BX_CPU_THIS_PTR vmcs;
   if (BX_CPU_THIS_PTR in_vmx_guest) {
-    VMCS_CACHE *vm = &BX_CPU_THIS_PTR vmcs;
     if (SECONDARY_VMEXEC_CONTROL(VMX_VM_EXEC_CTRL3_VIRTUALIZE_APIC_ACCESSES))
       if (PPFOf(paddr) == PPFOf(vm->apic_access_page)) return 1;
   }

@@ -32,20 +32,12 @@ class bx_netmod_ctl_c : public bx_netmod_ctl_stub_c {
 public:
   bx_netmod_ctl_c() {}
   virtual ~bx_netmod_ctl_c() {}
-  virtual void* init_module(bx_list_c *base, void* rxh, void* rxstat, bx_devmodel_c *dev);
+  virtual void* init_module(bx_list_c *base, void* rxh, bx_devmodel_c *dev);
 };
 
 #define BX_PACKET_BUFSIZE 2048 // Enough for an ether frame
 
-// device receive status definitions
-#define BX_NETDEV_RXREADY  0x0001
-#define BX_NETDEV_SPEED    0x000e
-#define BX_NETDEV_10MBIT   0x0002
-#define BX_NETDEV_100MBIT  0x0004
-#define BX_NETDEV_1GBIT    0x0008
-
 typedef void (*eth_rx_handler_t)(void *arg, const void *buf, unsigned len);
-typedef Bit32u (*eth_rx_status_t)(void *arg);
 
 typedef struct {
   Bit8u host_macaddr[6];
@@ -61,34 +53,10 @@ static const Bit8u broadcast_macaddr[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
 int execute_script(bx_devmodel_c *netdev, const char *name, char* arg1);
 void write_pktlog_txt(FILE *pktlog_txt, const Bit8u *buf, unsigned len, bx_bool host_to_guest);
 
-BX_CPP_INLINE Bit16u get_net2(const Bit8u *buf)
-{
-  return (((Bit16u)*buf) << 8) |
-         ((Bit16u)*(buf+1));
-}
-
-BX_CPP_INLINE void put_net2(Bit8u *buf,Bit16u data)
-{
-  *buf = (Bit8u)(data >> 8);
-  *(buf+1) = (Bit8u)(data & 0xff);
-}
-
-BX_CPP_INLINE Bit32u get_net4(const Bit8u *buf)
-{
-  return (((Bit32u)*buf) << 24) |
-         (((Bit32u)*(buf+1)) << 16) |
-         (((Bit32u)*(buf+2)) << 8) |
-         ((Bit32u)*(buf+3));
-}
-
-BX_CPP_INLINE void put_net4(Bit8u *buf,Bit32u data)
-{
-  *buf = (Bit8u)((data >> 24) & 0xff);
-  *(buf+1) = (Bit8u)((data >> 16) & 0xff);
-  *(buf+2) = (Bit8u)((data >> 8) & 0xff);
-  *(buf+3) = (Bit8u)(data & 0xff);
-}
-
+Bit16u get_net2(const Bit8u *buf);
+void put_net2(Bit8u *buf,Bit16u data);
+Bit32u get_net4(const Bit8u *buf);
+void put_net4(Bit8u *buf,Bit32u data);
 Bit16u ip_checksum(const Bit8u *buf, unsigned buf_len);
 int process_dhcp(bx_devmodel_c *netdev, const Bit8u *data, unsigned data_len, Bit8u *reply, dhcp_cfg_t *dhcp);
 
@@ -107,7 +75,6 @@ public:
 protected:
   bx_devmodel_c *netdev;
   eth_rx_handler_t  rxh;   // receive callback
-  eth_rx_status_t  rxstat; // receive status callback
 };
 
 
@@ -121,7 +88,6 @@ public:
   static eth_pktmover_c *create(const char *type, const char *netif,
                                 const char *macaddr,
                                 eth_rx_handler_t rxh,
-                                eth_rx_status_t rxstat,
                                 bx_devmodel_c *dev,
                                 const char *script);
 protected:
@@ -130,7 +96,6 @@ protected:
   virtual eth_pktmover_c *allocate(const char *netif,
                                    const char *macaddr,
                                    eth_rx_handler_t rxh,
-                                   eth_rx_status_t rxstat,
                                    bx_devmodel_c *dev,
                                    const char *script) = 0;
 private:

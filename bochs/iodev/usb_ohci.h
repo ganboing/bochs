@@ -136,7 +136,8 @@ struct OHCI_ISO_TD {
 
 
 typedef struct {
-  int   frame_timer_index;
+  int   frame_index;
+  int   interval_index;
 
   struct OHCI_OP_REGS {
     Bit16u HcRevision;
@@ -236,6 +237,8 @@ typedef struct {
   Bit64u   sof_time;
 
   int statusbar_id; // ID of the status LEDs
+  int iolight_counter;
+  int iolight_timer_index;
   Bit8u device_change;
 } bx_usb_ohci_t;
 
@@ -287,6 +290,9 @@ private:
   bx_bool read_handler(bx_phy_address addr, unsigned len, void *data, void *param);
   bx_bool write_handler(bx_phy_address addr, unsigned len, void *data, void *param);
 #endif
+
+  static void iolight_timer_handler(void *);
+  void iolight_timer(void);
 
   static void runtime_config_handler(void *);
   void runtime_config(void);

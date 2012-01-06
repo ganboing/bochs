@@ -44,7 +44,6 @@ int libioapic_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, cha
 
 void libioapic_LTX_plugin_fini(void)
 {
-  bx_devices.pluginIOAPIC = &bx_devices.stubIOAPIC;
   delete theIOAPIC;
 }
 
@@ -113,7 +112,7 @@ void bx_io_redirect_entry_t::register_state(bx_param_c *parent)
 bx_ioapic_c::bx_ioapic_c(): base_addr(BX_IOAPIC_BASE_ADDR)
 {
   set_id(BX_IOAPIC_DEFAULT_ID);
-  put("ioapic", "IOAP");
+  put("IOAP");
 }
 
 void bx_ioapic_c::init(void)

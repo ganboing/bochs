@@ -56,12 +56,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_DdRd(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_DR_WRITE_INTERCEPTED(i->nnn())) Svm_Vmexit(SVM_VMEXIT_DR0_WRITE + i->nnn());
-  }
-#endif
-
   invalidate_prefetch_q();
 
   /* This instruction is always treated as a register-to-register,
@@ -167,12 +161,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RdDd(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_DR_READ_INTERCEPTED(i->nnn())) Svm_Vmexit(SVM_VMEXIT_DR0_READ + i->nnn());
-  }
-#endif
-
   /* This instruction is always treated as a register-to-register,
    * regardless of the encoding of the MOD field in the MODRM byte.
    */
@@ -244,12 +232,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_DqRq(bxInstruction_c *i)
     BX_ERROR(("MOV_DqRq: #GP(0) if CPL is not 0"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_DR_WRITE_INTERCEPTED(i->nnn())) Svm_Vmexit(SVM_VMEXIT_DR0_WRITE + i->nnn());
-  }
-#endif
 
   invalidate_prefetch_q();
 
@@ -357,12 +339,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RqDq(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_DR_READ_INTERCEPTED(i->nnn())) Svm_Vmexit(SVM_VMEXIT_DR0_READ + i->nnn());
-  }
-#endif
-
   /* This instruction is always treated as a register-to-register,
    * regardless of the encoding of the MOD field in the MODRM byte.
    */
@@ -442,12 +418,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_CR2Rd(bxInstruction_c *i)
     BX_ERROR(("MOV_CR2Rd: CPL!=0 not in real mode"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(2)) Svm_Vmexit(SVM_VMEXIT_CR2_WRITE);
-  }
-#endif
 
   BX_CPU_THIS_PTR cr2 = BX_READ_32BIT_REG(i->rm());
 
@@ -547,12 +517,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RdCR2(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(2)) Svm_Vmexit(SVM_VMEXIT_CR2_READ);
-  }
-#endif
-
   BX_WRITE_32BIT_REGZ(i->rm(), (Bit32u) BX_CPU_THIS_PTR cr2);
 
   BX_NEXT_INSTR(i);
@@ -565,12 +529,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RdCR3(bxInstruction_c *i)
     BX_ERROR(("MOV_RdCd: CPL!=0 not in real mode"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(3)) Svm_Vmexit(SVM_VMEXIT_CR3_READ);
-  }
-#endif
 
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest)
@@ -642,12 +600,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_CR2Rq(bxInstruction_c *i)
     BX_ERROR(("MOV_CR2Rq: #GP(0) if CPL is not 0"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(2)) Svm_Vmexit(SVM_VMEXIT_CR2_WRITE);
-  }
-#endif
 
   BX_CPU_THIS_PTR cr2 = BX_READ_64BIT_REG(i->rm());
 
@@ -747,12 +699,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RqCR2(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(2)) Svm_Vmexit(SVM_VMEXIT_CR2_READ);
-  }
-#endif
-
   BX_WRITE_64BIT_REG(i->rm(), BX_CPU_THIS_PTR cr2);
 
   BX_NEXT_INSTR(i);
@@ -769,12 +715,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MOV_RqCR3(bxInstruction_c *i)
     BX_ERROR(("MOV_RqCR3: #GP(0) if CPL is not 0"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(3)) Svm_Vmexit(SVM_VMEXIT_CR3_READ);
-  }
-#endif
 
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest)
@@ -816,12 +756,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::LMSW_Ew(bxInstruction_c *i)
     exception(BX_GP_EXCEPTION, 0);
   }
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(0)) Svm_Vmexit(SVM_VMEXIT_CR0_WRITE);
-  }  
-#endif
-
   if (i->modC0()) {
     msw = BX_READ_16BIT_REG(i->rm());
   }
@@ -841,7 +775,7 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::LMSW_Ew(bxInstruction_c *i)
 
   // LMSW cannot clear PE
   if (BX_CPU_THIS_PTR cr0.get_PE())
-    msw |= BX_CR0_PE_MASK; // adjust PE bit to current value of 1
+    msw |= 0x1; // adjust PE bit to current value of 1
 
   msw &= 0xf; // LMSW only affects last 4 flags
 
@@ -879,12 +813,6 @@ bx_address BX_CPU_C::read_CR0(void)
 {
   bx_address cr0_val = BX_CPU_THIS_PTR cr0.get32();
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(0)) Svm_Vmexit(SVM_VMEXIT_CR0_READ);
-  }
-#endif
-
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest) {
     VMCS_CACHE *vm = &BX_CPU_THIS_PTR vmcs;
@@ -899,12 +827,6 @@ bx_address BX_CPU_C::read_CR0(void)
 bx_address BX_CPU_C::read_CR4(void)
 {
   bx_address cr4_val = BX_CPU_THIS_PTR cr4.get32();
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_READ_INTERCEPTED(4)) Svm_Vmexit(SVM_VMEXIT_CR4_READ);
-  }
-#endif
 
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest) {
@@ -1006,6 +928,17 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetCR0(bx_address val)
   }
 #endif  // #if BX_SUPPORT_X86_64
 
+  Bit32u oldCR0 = BX_CPU_THIS_PTR cr0.get32();
+
+#if BX_CPU_LEVEL >= 6
+  if (pg && BX_CPU_THIS_PTR cr4.get_PAE() && !long_mode()) {
+    if (! CheckPDPTR(BX_CPU_THIS_PTR cr3)) {
+      BX_ERROR(("SetCR0(): PDPTR check failed !"));
+      return 0;
+    }
+  }
+#endif
+
   // handle reserved bits behaviour
 #if BX_CPU_LEVEL == 3
   val_32 = val_32 | 0x7ffffff0;
@@ -1018,31 +951,6 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetCR0(bx_address val)
 #else
 #error "SetCR0: implement reserved bits behaviour for this CPU_LEVEL"
 #endif
-
-  Bit32u oldCR0 = BX_CPU_THIS_PTR cr0.get32();
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(0)) Svm_Vmexit(SVM_VMEXIT_CR0_WRITE);
-
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_CR0_WRITE_NO_TS_MP)) {
-      if ((oldCR0 & 0xfffffff5) != (val_32 & 0xfffffff5)) {
-        // any other bit except TS or MP had changed
-        Svm_Vmexit(SVM_VMEXIT_CR0_SEL_WRITE);
-      } 
-    }
-  }
-#endif
-
-#if BX_CPU_LEVEL >= 6
-  if (pg && BX_CPU_THIS_PTR cr4.get_PAE() && !long_mode()) {
-    if (! CheckPDPTR(BX_CPU_THIS_PTR cr3)) {
-      BX_ERROR(("SetCR0(): PDPTR check failed !"));
-      return 0;
-    }
-  }
-#endif
-
   BX_CPU_THIS_PTR cr0.set32(val_32);
 
 #if BX_CPU_LEVEL >= 4 && BX_SUPPORT_ALIGNMENT_CHECK
@@ -1206,12 +1114,6 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetCR4(bx_address val)
 {
   if (! check_CR4(val)) return 0;
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(4)) Svm_Vmexit(SVM_VMEXIT_CR4_WRITE);
-  }
-#endif
-
 #if BX_CPU_LEVEL >= 6
   // Modification of PGE,PAE,PSE,PCIDE,SMEP flushes TLB cache according to docs.
   if ((val & BX_CR4_FLUSH_TLB_MASK) != (BX_CPU_THIS_PTR cr4.val32 & BX_CR4_FLUSH_TLB_MASK)) {
@@ -1261,12 +1163,6 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetCR3(bx_address val)
   }
 #endif
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(3)) Svm_Vmexit(SVM_VMEXIT_CR3_WRITE);
-  }
-#endif
-
   BX_CPU_THIS_PTR cr3 = val;
 
   // flush TLB even if value does not change
@@ -1283,12 +1179,12 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetCR3(bx_address val)
 #if BX_CPU_LEVEL >= 5
 bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetEFER(bx_address val_64)
 {
-  Bit32u val32 = (Bit32u) val_64;
-
   if (val_64 & ~((Bit64u) BX_CPU_THIS_PTR efer_suppmask)) {
-    BX_ERROR(("SetEFER(0x%08x): attempt to set reserved bits of EFER MSR !", val32));
+    BX_ERROR(("SetEFER: attempt to set reserved bits of EFER MSR !"));
     return 0;
   }
+
+  Bit32u val32 = (Bit32u) val_64;
 
 #if BX_SUPPORT_X86_64
   /* #GP(0) if changing EFER.LME when cr0.pg = 1 */
@@ -1310,12 +1206,6 @@ bx_bool BX_CPP_AttrRegparmN(1) BX_CPU_C::SetEFER(bx_address val_64)
 #if BX_CPU_LEVEL >= 6
 void BX_CPU_C::WriteCR8(bxInstruction_c *i, bx_address val)
 {
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_CR_WRITE_INTERCEPTED(8)) Svm_Vmexit(SVM_VMEXIT_CR8_READ);
-  }
-#endif
-
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest)
     VMexit_CR8_Write(i);
@@ -1326,55 +1216,47 @@ void BX_CPU_C::WriteCR8(bxInstruction_c *i, bx_address val)
   //   APIC.TPR[3:0] = 0
   // Reads of CR8 return zero extended APIC.TPR[7:4]
   // Write to CR8 update APIC.TPR[7:4]
+#if BX_SUPPORT_APIC
   if (val & BX_CONST64(0xfffffffffffffff0)) {
     BX_ERROR(("WriteCR8: Attempt to set reserved bits of CR8"));
     exception(BX_GP_EXCEPTION, 0);
   }
-  unsigned tpr = (val & 0xf) << 4;
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    SVM_V_TPR = tpr;
-    if (SVM_V_INTR_MASKING) return;
-  }
-#endif
-
 #if BX_SUPPORT_VMX && BX_SUPPORT_X86_64
   if (BX_CPU_THIS_PTR in_vmx_guest && VMEXIT(VMX_VM_EXEC_CTRL2_TPR_SHADOW)) {
-    VMX_Write_VTPR(tpr);
-    return;
+    VMX_Write_VTPR((val & 0xf) << 4);
   }
+  else
 #endif
-
-  BX_CPU_THIS_PTR lapic.set_tpr(tpr);
+  {
+    BX_CPU_THIS_PTR lapic.set_tpr((val & 0xf) << 4);
+  }
+#endif // BX_SUPPORT_APIC
 }
 
 Bit32u BX_CPU_C::ReadCR8(bxInstruction_c *i)
 {
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_CR_WRITE_INTERCEPTED(8)) Svm_Vmexit(SVM_VMEXIT_CR8_READ);
-
-    if (SVM_V_INTR_MASKING) return SVM_V_TPR;
-  }
-#endif
+  Bit32u tpr = 0;
 
 #if BX_SUPPORT_VMX && BX_SUPPORT_X86_64
   if (BX_CPU_THIS_PTR in_vmx_guest)
     VMexit_CR8_Read(i);
 
   if (BX_CPU_THIS_PTR in_vmx_guest && VMEXIT(VMX_VM_EXEC_CTRL2_TPR_SHADOW)) {
-     Bit32u tpr = (VMX_Read_VTPR() >> 4) & 0xf;
-     return tpr;
+     tpr = (VMX_Read_VTPR() >> 4) & 0xf;
   }
+  else
 #endif
+  {
+    // CR8 is aliased to APIC->TASK PRIORITY register
+    //   APIC.TPR[7:4] = CR8[3:0]
+    //   APIC.TPR[3:0] = 0
+    // Reads of CR8 return zero extended APIC.TPR[7:4]
+    // Write to CR8 update APIC.TPR[7:4]
+#if BX_SUPPORT_APIC
+    tpr = (BX_CPU_THIS_PTR lapic.get_tpr() >> 4) & 0xf;
+#endif
+  }
 
-  // CR8 is aliased to APIC->TASK PRIORITY register
-  //   APIC.TPR[7:4] = CR8[3:0]
-  //   APIC.TPR[3:0] = 0
-  // Reads of CR8 return zero extended APIC.TPR[7:4]
-  // Write to CR8 update APIC.TPR[7:4]
-  Bit32u tpr = (BX_CPU_THIS_PTR lapic.get_tpr() >> 4) & 0xf;
   return tpr;
 }
 
@@ -1393,12 +1275,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::CLTS(bxInstruction_c *i)
     if(VMexit_CLTS(i)) {
       BX_NEXT_TRACE(i);
     }
-  }
-#endif
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if(SVM_CR_WRITE_INTERCEPTED(0)) Svm_Vmexit(SVM_VMEXIT_CR0_WRITE);
   }
 #endif
 

@@ -47,7 +47,7 @@ class bx_win32_gui_c : public bx_gui_c {
 public:
   bx_win32_gui_c (void) {}
   DECLARE_GUI_VIRTUAL_METHODS();
-  virtual void statusbar_setitem_specific(int element, bx_bool active, bx_bool w);
+  virtual void statusbar_setitem(int element, bx_bool active, bx_bool w=0);
   virtual void get_capabilities(Bit16u *xres, Bit16u *yres, Bit16u *bpp);
   virtual void set_tooltip(unsigned hbar_id, const char *tip);
 #if BX_SHOW_IPS
@@ -957,9 +957,15 @@ void SetStatusText(int Num, const char *Text, bx_bool active, bx_bool w)
   UpdateWindow(hwndSB);
 }
 
-void bx_win32_gui_c::statusbar_setitem_specific(int element, bx_bool active, bx_bool w)
+void bx_win32_gui_c::statusbar_setitem(int element, bx_bool active, bx_bool w)
 {
-  SetStatusText(element+BX_SB_TEXT_ELEMENTS, statusitem[element].text, active, w);
+  if (element < 0) {
+    for (int i = 0; i < (int)statusitem_count; i++) {
+      SetStatusText(i+BX_SB_TEXT_ELEMENTS, statusitem_text[i], 0, 0);
+    }
+  } else if (element < (int)statusitem_count) {
+    SetStatusText(element+BX_SB_TEXT_ELEMENTS, statusitem_text[element], active, w);
+  }
 }
 
 LRESULT CALLBACK mainWndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)

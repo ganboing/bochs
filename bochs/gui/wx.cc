@@ -67,7 +67,7 @@ public:
   bx_wx_gui_c (void) {}
   DECLARE_GUI_VIRTUAL_METHODS()
   DECLARE_GUI_NEW_VIRTUAL_METHODS()
-  void statusbar_setitem_specific(int element, bx_bool active, bx_bool w);
+  void statusbar_setitem(int element, bx_bool active, bx_bool w=0);
 #if BX_SHOW_IPS
   void show_ips(Bit32u ips_count);
 #endif
@@ -1074,24 +1074,30 @@ void bx_wx_gui_c::handle_events(void)
   num_events = 0;
 }
 
-void bx_wx_gui_c::statusbar_setitem_specific(int element, bx_bool active, bx_bool w)
+void bx_wx_gui_c::statusbar_setitem(int element, bx_bool active, bx_bool w)
 {
 #if defined(__WXMSW__)
   char status_text[10];
 #endif
 
   wxMutexGuiEnter();
-  if (active) {
+  if (element < 0) {
+    for (unsigned i = 0; i < statusitem_count; i++) {
+      theFrame->SetStatusText(wxT(""), i+1);
+    }
+  } else if ((unsigned)element < statusitem_count) {
+    if (active) {
 #if defined(__WXMSW__)
-    status_text[0] = 9;
-    strcpy(status_text+1, statusitem[element].text);
-    theFrame->SetStatusText(status_text, element+1);
+        status_text[0] = 9;
+        strcpy(status_text+1, statusitem_text[element]);
+        theFrame->SetStatusText(status_text, element+1);
 #else
-    theFrame->SetStatusText(wxString(statusitem[element].text, wxConvUTF8),
-                            element+1);
+      theFrame->SetStatusText(wxString(statusitem_text[element], wxConvUTF8),
+        element+1);
 #endif
-  } else {
-    theFrame->SetStatusText(wxT(""), element+1);
+    } else {
+      theFrame->SetStatusText(wxT(""), element+1);
+    }
   }
   wxMutexGuiLeave();
 }

@@ -69,7 +69,6 @@ extern "C" {
 #define BX_PLUGIN_USB_OHCI  "usb_ohci"
 #define BX_PLUGIN_USB_XHCI  "usb_xhci"
 #define BX_PLUGIN_PCIPNIC   "pcipnic"
-#define BX_PLUGIN_E1000     "e1000"
 #define BX_PLUGIN_GAMEPORT  "gameport"
 #define BX_PLUGIN_SPEAKER   "speaker"
 #define BX_PLUGIN_ACPI      "acpi"
@@ -78,16 +77,13 @@ extern "C" {
 
 
 #define BX_REGISTER_DEVICE_DEVMODEL(a,b,c,d) pluginRegisterDeviceDevmodel(a,b,c,d)
-#define BX_UNREGISTER_DEVICE_DEVMODEL(a) pluginUnregisterDeviceDevmodel(a)
-#define PLUG_device_present(a) pluginDevicePresent(a)
 
 #if BX_PLUGINS
 
 #define PLUG_load_plugin(name,type) {bx_load_plugin(#name,type);}
-#define PLUG_load_opt_plugin(name) bx_load_plugin(name,PLUGTYPE_OPTIONAL)
+#define PLUG_load_opt_plugin(name) {bx_load_plugin(name,PLUGTYPE_OPTIONAL);}
 #define PLUG_load_user_plugin(name) {bx_load_plugin(name,PLUGTYPE_USER);}
 #define PLUG_unload_plugin(name) {bx_unload_plugin(#name,1);}
-#define PLUG_unload_opt_plugin(name) bx_unload_plugin(name,1)
 #define PLUG_unload_user_plugin(name) {bx_unload_plugin(name,1);}
 
 #define DEV_register_ioread_handler(b,c,d,e,f)  pluginRegisterIOReadHandler(b,c,d,e,f)
@@ -109,9 +105,7 @@ extern "C" {
 // When plugins are off, PLUG_load_plugin will call the plugin_init function
 // directly.
 #define PLUG_load_plugin(name,type) {lib##name##_LTX_plugin_init(NULL,type,0,NULL);}
-#define PLUG_load_opt_plugin(name) bx_load_opt_plugin(name)
 #define PLUG_unload_plugin(name) {lib##name##_LTX_plugin_fini();}
-#define PLUG_unload_opt_plugin(name) bx_unload_opt_plugin(name,1);
 #define DEV_register_ioread_handler(b,c,d,e,f) bx_devices.register_io_read_handler(b,c,d,e,f)
 #define DEV_register_iowrite_handler(b,c,d,e,f) bx_devices.register_io_write_handler(b,c,d,e,f)
 #define DEV_unregister_ioread_handler(b,c,d,e)  bx_devices.unregister_io_read_handler(b,c,d,e)
@@ -265,8 +259,8 @@ extern "C" {
   ((bx_sound_lowlevel_c*)bx_devices.pluginSoundModCtl->init_module(a,b))
 
 ///////// Networking module macro
-#define DEV_net_init_module(a,b,c,d) \
-  ((eth_pktmover_c*)bx_devices.pluginNetModCtl->init_module(a,(void*)b,(void*)c,d))
+#define DEV_net_init_module(a,b,c) \
+  ((eth_pktmover_c*)bx_devices.pluginNetModCtl->init_module(a,(void*)b,c))
 
 ///////// Gameport macro
 #define DEV_gameport_set_enabled(a) bx_devices.pluginGameport->set_enabled(a)
@@ -306,8 +300,7 @@ typedef void (*deviceInitDev_t)(void);
 typedef void (*deviceReset_t)(unsigned);
 
 BOCHSAPI void pluginRegisterDeviceDevmodel(plugin_t *plugin, plugintype_t type, bx_devmodel_c *dev, const char *name);
-BOCHSAPI void pluginUnregisterDeviceDevmodel(const char *name);
-BOCHSAPI bx_bool pluginDevicePresent(const char *name);
+BOCHSAPI bx_bool pluginDevicePresent(char *name);
 
 /* === IO port stuff === */
 BOCHSAPI extern int (*pluginRegisterIOReadHandler)(void *thisPtr, ioReadHandler_t callback,
@@ -384,11 +377,6 @@ extern void bx_unload_plugins(void);
 extern void bx_plugins_register_state(void);
 extern void bx_plugins_after_restore_state(void);
 
-#if !BX_PLUGINS
-int bx_load_opt_plugin(const char *name);
-int bx_unload_opt_plugin(const char *name, bx_bool devflag);
-#endif
-
 // every plugin must define these, within the extern"C" block, so that
 // a non-mangled function symbol is available in the shared library.
 void plugin_fini(void);
@@ -434,7 +422,6 @@ DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(es1370)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(netmod)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(ne2k)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(pcipnic)
-DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(e1000)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(extfpuirq)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(gameport)
 DECLARE_PLUGIN_INIT_FINI_FOR_MODULE(speaker)

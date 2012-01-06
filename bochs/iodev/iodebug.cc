@@ -45,7 +45,6 @@ int libiodebug_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, ch
 
 void libiodebug_LTX_plugin_fini(void)
 {
-  bx_devices.pluginIODebug = &bx_devices.stubIODebug;
   delete theIODebugDevice;
 }
 
@@ -60,7 +59,7 @@ struct bx_iodebug_s_type {
 
 bx_iodebug_c::bx_iodebug_c()
 {
-  put("iodebug", "IODBG");
+  put("IODBG");
 }
 
 void bx_iodebug_c::init(void)

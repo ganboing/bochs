@@ -125,7 +125,7 @@ bx_hard_drive_c::bx_hard_drive_c()
 #   error code must be fixed to use DLL_HD_SUPPORT and 4 ata channels
 #endif
 
-  put("harddrv", "HD");
+  put("HD");
   for (Bit8u channel=0; channel<BX_MAX_ATA_CHANNEL; channel++) {
     for (Bit8u device=0; device<2; device ++) {
       channels[channel].drives[device].hdimage =  NULL;
@@ -134,7 +134,7 @@ bx_hard_drive_c::bx_hard_drive_c()
 #endif
     }
   }
-  seek_timer_index = BX_NULL_TIMER_HANDLE;
+  iolight_timer_index = BX_NULL_TIMER_HANDLE;
 }
 
 bx_hard_drive_c::~bx_hard_drive_c()
@@ -266,6 +266,7 @@ void bx_hard_drive_c::init(void)
       // If not present
       BX_HD_THIS channels[channel].drives[device].device_type           = IDE_NONE;
       BX_HD_THIS channels[channel].drives[device].statusbar_id = -1;
+      BX_HD_THIS channels[channel].drives[device].iolight_counter = 0;
       BX_HD_THIS channels[channel].drives[device].identify_set = 0;
       if (!SIM->get_param_bool("present", base)->get()) continue;
 
@@ -282,7 +283,7 @@ void bx_hard_drive_c::init(void)
         BX_HD_THIS channels[channel].drives[device].device_type = IDE_DISK;
         sprintf(sbtext, "HD:%d-%s", channel, device?"S":"M");
         BX_HD_THIS channels[channel].drives[device].statusbar_id =
-          bx_gui->register_statusitem(sbtext, 1);
+          bx_gui->register_statusitem(sbtext);
 
         int cyl = SIM->get_param_num("cylinders", base)->get();
         int heads = SIM->get_param_num("heads", base)->get();
@@ -358,7 +359,7 @@ void bx_hard_drive_c::init(void)
         BX_HD_THIS channels[channel].drives[device].sense.ascq = 0;
         sprintf(sbtext, "CD:%d-%s", channel, device?"S":"M");
         BX_HD_THIS channels[channel].drives[device].statusbar_id =
-          bx_gui->register_statusitem(sbtext, 1);
+          bx_gui->register_statusitem(sbtext);
         BX_HD_THIS cdrom_count++;
         BX_HD_THIS channels[channel].drives[device].device_num = BX_HD_THIS cdrom_count + 48;
 
@@ -548,11 +549,10 @@ void bx_hard_drive_c::init(void)
              SIM->get_param_bool(BXPN_FLOPPYSIGCHECK)->get() ? "dis" : "en"));
   }
 
-  // register timer for HD/CD seek emulation
-  if (BX_HD_THIS seek_timer_index == BX_NULL_TIMER_HANDLE) {
-    BX_HD_THIS seek_timer_index =
-      DEV_register_timer(this, seek_timer_handler, 100000, 0,0, "HD/CD seek");
-    // TODO !!!
+  // register timer for HD/CD i/o light
+  if (BX_HD_THIS iolight_timer_index == BX_NULL_TIMER_HANDLE) {
+    BX_HD_THIS iolight_timer_index =
+      DEV_register_timer(this, iolight_timer_handler, 100000, 0,0, "HD/CD i/o light");
   }
 
   // register handler for correct cdrom parameter handling after runtime config
@@ -623,17 +623,22 @@ void bx_hard_drive_c::register_state(void)
   }
 }
 
-void bx_hard_drive_c::seek_timer_handler(void *this_ptr)
+void bx_hard_drive_c::iolight_timer_handler(void *this_ptr)
 {
   bx_hard_drive_c *class_ptr = (bx_hard_drive_c *) this_ptr;
-  class_ptr->seek_timer();
+  class_ptr->iolight_timer();
 }
 
-void bx_hard_drive_c::seek_timer()
+void bx_hard_drive_c::iolight_timer()
 {
   for (unsigned channel=0; channel<BX_MAX_ATA_CHANNEL; channel++) {
     for (unsigned device=0; device<2; device++) {
-      // TODO: seek emulation
+      if (BX_HD_THIS channels[channel].drives[device].iolight_counter > 0) {
+        if (--BX_HD_THIS channels[channel].drives[device].iolight_counter)
+          bx_pc_system.activate_timer(BX_HD_THIS iolight_timer_index, 100000, 0);
+        else
+          bx_gui->statusbar_setitem(BX_HD_THIS channels[channel].drives[device].statusbar_id, 0);
+      }
     }
   }
 }
@@ -858,7 +863,10 @@ Bit32u bx_hard_drive_c::read(Bit32u address, unsigned io_len)
                     BX_PANIC(("Read with CDROM not ready"));
                   }
                   /* set status bar conditions for device */
-                  bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+                  if (!BX_SELECTED_DRIVE(channel).iolight_counter)
+                    bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+                  BX_SELECTED_DRIVE(channel).iolight_counter = 5;
+                  bx_pc_system.activate_timer(BX_HD_THIS iolight_timer_index, 100000, 0);
                   if (!BX_SELECTED_DRIVE(channel).cdrom.cd->read_block(BX_SELECTED_CONTROLLER(channel).buffer,
                                                                        BX_SELECTED_DRIVE(channel).cdrom.next_lba,
                                                                        BX_SELECTED_CONTROLLER(channel).buffer_size))
@@ -3219,7 +3227,10 @@ bx_bool bx_hard_drive_c::bmdma_read_sector(Bit8u channel, Bit8u *buffer, Bit32u 
             return 0;
           }
           /* set status bar conditions for device */
-          bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+          if (!BX_SELECTED_DRIVE(channel).iolight_counter)
+            bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+          BX_SELECTED_DRIVE(channel).iolight_counter = 5;
+          bx_pc_system.activate_timer(BX_HD_THIS iolight_timer_index, 100000, 0);
 #ifdef LOWLEVEL_CDROM
           if (!BX_SELECTED_DRIVE(channel).cdrom.cd->read_block(buffer, BX_SELECTED_DRIVE(channel).cdrom.next_lba,
                                                                BX_SELECTED_CONTROLLER(channel).buffer_size))
@@ -3319,7 +3330,10 @@ bx_bool bx_hard_drive_c::ide_read_sector(Bit8u channel, Bit8u *buffer, Bit32u bu
       return 0;
     }
     /* set status bar conditions for device */
-    bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+    if (!BX_SELECTED_DRIVE(channel).iolight_counter)
+      bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1);
+    BX_SELECTED_DRIVE(channel).iolight_counter = 5;
+    bx_pc_system.activate_timer(BX_HD_THIS iolight_timer_index, 100000, 0);
     ret = BX_SELECTED_DRIVE(channel).hdimage->read((bx_ptr_t)bufptr, 512);
     if (ret < 512) {
       BX_ERROR(("could not read() hard drive image file at byte %lu", (unsigned long)logical_sector*512));
@@ -3353,7 +3367,10 @@ bx_bool bx_hard_drive_c::ide_write_sector(Bit8u channel, Bit8u *buffer, Bit32u b
       return 0;
     }
     /* set status bar conditions for device */
-    bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1, 1 /* write */);
+    if (!BX_SELECTED_DRIVE(channel).iolight_counter)
+      bx_gui->statusbar_setitem(BX_SELECTED_DRIVE(channel).statusbar_id, 1, 1 /* write */);
+    BX_SELECTED_DRIVE(channel).iolight_counter = 5;
+    bx_pc_system.activate_timer(BX_HD_THIS iolight_timer_index, 100000, 0);
     ret = BX_SELECTED_DRIVE(channel).hdimage->write((bx_ptr_t)bufptr, 512);
     if (ret < 512) {
       BX_ERROR(("could not write() hard drive image file at byte %lu", (unsigned long)logical_sector*512));

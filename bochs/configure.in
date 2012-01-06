@@ -8,13 +8,13 @@ AC_CONFIG_HEADER(ltdlconf.h)
 
 dnl // Put Bochs version information right here so that it gets substituted
 dnl // into all the right places.
-VERSION="2.5.svn"
-VER_STRING="2.5.svn"
+VERSION="2.5.1"
+VER_STRING="2.5.1"
 dnl // WIN_VER_STRING format is "a, b, c, d"
 dnl // c should be > 90 for pre-release of next version otherwise patch level
 dnl // d should be 0 for release and 1 for svn version
-WIN_VER_STRING="2, 5, 0, 1"
-REL_STRING="Built from SVN snapshot, after release 2.5"
+WIN_VER_STRING="2, 5, 1, 0"
+REL_STRING="Built from SVN snapshot on January 6, 2012"
 
 changequote(<<, >>)
 changequote([, ])
@@ -812,24 +812,6 @@ AC_ARG_ENABLE(pnic,
     ]
   )
 
-AC_MSG_CHECKING(for Intel(R) Gigabit Ethernet support)
-AC_ARG_ENABLE(e1000,
-  [  --enable-e1000                    enable Intel(R) Gigabit Ethernet support],
-  [if test "$enableval" = yes; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(BX_SUPPORT_E1000, 1)
-    PCI_OBJ="$PCI_OBJ e1000.o"
-    networking=yes
-   else
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_SUPPORT_E1000, 0)
-   fi],
-  [
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_SUPPORT_E1000, 0)
-    ]
-  )
-
 NETLOW_OBJS=''
 if test "$networking" = yes; then
   NETLOW_OBJS='eth_null.o eth_vnet.o'
@@ -1467,33 +1449,6 @@ fi
 
 if test "$support_vmx" -gt 1 -a "$use_x86_64" = 0; then
   AC_MSG_ERROR([VMXx2 support require x86-64 enabled])
-fi
-
-support_svm=0
-AC_MSG_CHECKING(for SVM support)
-AC_ARG_ENABLE(svm,
-  [  --enable-svm                      SVM (AMD: secure virtual machine) emulation],
-  [if test "$enableval" = yes; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(BX_SUPPORT_SVM, 1)
-    support_svm=1
-   elif test "$enableval" = no; then
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_SUPPORT_SVM, 0)
-   fi
-   ],
-  [
-    AC_MSG_RESULT(no)
-    AC_DEFINE(BX_SUPPORT_SVM, 0)
-    ]
-  )
-
-if test "$support_svm" -gt 0 -a "$bx_cpu_level" -lt 6; then
-  AC_MSG_ERROR([for SVM support the CPU level must be set to 6])
-fi
-
-if test "$support_svm" -gt 1 -a "$use_x86_64" = 0; then
-  AC_MSG_ERROR([SVM support require x86-64 enabled])
 fi
 
 AC_MSG_CHECKING(for 3DNow! support)

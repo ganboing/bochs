@@ -48,12 +48,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::PAUSE(bxInstruction_c *i)
     VMexit_PAUSE(i);
 #endif
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_PAUSE)) Svm_Vmexit(SVM_VMEXIT_PAUSE);
-  }
-#endif
-
   BX_NEXT_INSTR(i);
 }
 
@@ -78,12 +72,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::CPUID(bxInstruction_c *i)
   }
 #endif
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_CPUID)) Svm_Vmexit(SVM_VMEXIT_CPUID);
-  }
-#endif
-
   struct cpuid_function_t leaf;
   BX_CPU_THIS_PTR cpuid->get_cpuid_leaf(EAX, ECX, &leaf);
 
@@ -105,12 +93,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::CPUID(bxInstruction_c *i)
 //
 void BX_CPU_C::shutdown(void)
 {
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_SHUTDOWN)) Svm_Vmexit(SVM_VMEXIT_SHUTDOWN);
-  }
-#endif
-
   BX_PANIC(("Entering to shutdown state still not implemented"));
 
   BX_CPU_THIS_PTR clear_IF();
@@ -151,12 +133,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::HLT(bxInstruction_c *i)
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest)
     VMexit_HLT(i);
-#endif
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_HLT)) Svm_Vmexit(SVM_VMEXIT_HLT);
-  }
 #endif
 
   // stops instruction execution and places the processor in a
@@ -201,12 +177,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::INVD(bxInstruction_c *i)
   }
 #endif
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_INVD)) Svm_Vmexit(SVM_VMEXIT_INVD);
-  }
-#endif
-
   invalidate_prefetch_q();
 
   BX_DEBUG(("INVD: Flush internal caches !"));
@@ -229,12 +199,6 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::WBINVD(bxInstruction_c *i)
 #if BX_SUPPORT_VMX
   if (BX_CPU_THIS_PTR in_vmx_guest)
     VMexit_WBINVD(i);
-#endif
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT1_WBINVD)) Svm_Vmexit(SVM_VMEXIT_WBINVD);
-  }
 #endif
 
   invalidate_prefetch_q();
@@ -316,7 +280,6 @@ void BX_CPU_C::handleCpuModeChange(void)
     if (BX_CPU_THIS_PTR cr0.get_PE()) {
       if (BX_CPU_THIS_PTR get_VM()) {
         BX_CPU_THIS_PTR cpu_mode = BX_MODE_IA32_V8086;
-        CPL = 3;
       }
       else
         BX_CPU_THIS_PTR cpu_mode = BX_MODE_IA32_PROTECTED;
@@ -329,7 +292,7 @@ void BX_CPU_C::handleCpuModeChange(void)
       BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.segment  = 1;  /* data/code segment */
       BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.type = BX_DATA_READ_WRITE_ACCESSED;
 
-      CPL = 0;
+      BX_ASSERT(CPL == 0);
     }
   }
 
@@ -437,48 +400,43 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::BxNoAVX(bxInstruction_c *i)
 BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::RDPMC(bxInstruction_c *i)
 {
 #if BX_CPU_LEVEL >= 5
-  if (! BX_CPU_THIS_PTR cr4.get_PCE() && CPL != 0 ) {
-    BX_ERROR(("RDPMC: not allowed to use instruction !"));
-    exception(BX_GP_EXCEPTION, 0);
-  }
+  if (BX_CPU_THIS_PTR cr4.get_PCE() || CPL==0 || real_mode()) {
 
 #if BX_SUPPORT_VMX
-  if (BX_CPU_THIS_PTR in_vmx_guest) 
-    VMexit_RDPMC(i);
+    if (BX_CPU_THIS_PTR in_vmx_guest)
+      VMexit_RDPMC(i);
 #endif
 
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest) {
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_RDPMC)) Svm_Vmexit(SVM_VMEXIT_RDPMC);
+    /* According to manual, Pentium 4 has 18 counters,
+     * previous versions have two.  And the P4 also can do
+     * short read-out (EDX always 0).  Otherwise it is
+     * limited to 40 bits.
+     */
+
+    if (BX_CPUID_SUPPORT_ISA_EXTENSION(BX_ISA_SSE2)) { // Pentium 4 processor (see cpuid.cc)
+      if ((ECX & 0x7fffffff) >= 18)
+        exception(BX_GP_EXCEPTION, 0);
+    }
+    else {
+      if ((ECX & 0xffffffff) >= 2)
+        exception(BX_GP_EXCEPTION, 0);
+    }
+
+    // Most counters are for hardware specific details, which
+    // we anyhow do not emulate (like pipeline stalls etc)
+
+    // Could be interesting to count number of memory reads,
+    // writes.  Misaligned etc...  But to monitor bochs, this
+    // is easier done from the host.
+
+    RAX = 0;
+    RDX = 0; // if P4 and ECX & 0x10000000, then always 0 (short read 32 bits)
+
+    BX_ERROR(("RDPMC: Performance Counters Support not reasonably implemented yet"));
+  } else {
+    // not allowed to use RDPMC!
+    exception(BX_GP_EXCEPTION, 0);
   }
-#endif
-
-  /* According to manual, Pentium 4 has 18 counters,
-   * previous versions have two.  And the P4 also can do
-   * short read-out (EDX always 0).  Otherwise it is
-   * limited to 40 bits.
-   */
-
-  if (BX_CPUID_SUPPORT_ISA_EXTENSION(BX_ISA_SSE2)) { // Pentium 4 processor (see cpuid.cc)
-    if ((ECX & 0x7fffffff) >= 18)
-      exception(BX_GP_EXCEPTION, 0);
-  }
-  else {
-    if ((ECX & 0xffffffff) >= 2)
-      exception(BX_GP_EXCEPTION, 0);
-  }
-
-  // Most counters are for hardware specific details, which
-  // we anyhow do not emulate (like pipeline stalls etc)
-
-  // Could be interesting to count number of memory reads,
-  // writes.  Misaligned etc...  But to monitor bochs, this
-  // is easier done from the host.
-
-  RAX = 0;
-  RDX = 0; // if P4 and ECX & 0x10000000, then always 0 (short read 32 bits)
-
-  BX_ERROR(("RDPMC: Performance Counters Support not implemented yet"));
 #endif
 
   BX_NEXT_INSTR(i);
@@ -487,9 +445,10 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::RDPMC(bxInstruction_c *i)
 #if BX_CPU_LEVEL >= 5
 Bit64u BX_CPU_C::get_TSC(void)
 {
-  Bit64u tsc = bx_pc_system.time_ticks() - BX_CPU_THIS_PTR tsc_last_reset;
-#if BX_SUPPORT_VMX || BX_SUPPORT_SVM
-  tsc += BX_CPU_THIS_PTR tsc_offset;
+  Bit64u tsc = bx_pc_system.time_ticks() - BX_CPU_THIS_PTR msr.tsc_last_reset;
+#if BX_SUPPORT_VMX
+  if (BX_CPU_THIS_PTR in_vmx_guest)
+    tsc += VMX_TSC_Offset();
 #endif
   return tsc;
 }
@@ -498,7 +457,7 @@ void BX_CPU_C::set_TSC(Bit64u newval)
 {
   // compute the correct setting of tsc_last_reset so that a get_TSC()
   // will return newval
-  BX_CPU_THIS_PTR tsc_last_reset = bx_pc_system.time_ticks() - newval;
+  BX_CPU_THIS_PTR msr.tsc_last_reset = bx_pc_system.time_ticks() - newval;
 
   // verify
   BX_ASSERT(get_TSC() == newval);
@@ -508,28 +467,25 @@ void BX_CPU_C::set_TSC(Bit64u newval)
 BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::RDTSC(bxInstruction_c *i)
 {
 #if BX_CPU_LEVEL >= 5
-  if (BX_CPU_THIS_PTR cr4.get_TSD() && CPL != 0) {
+  if (! BX_CPU_THIS_PTR cr4.get_TSD() || CPL==0) {
+
+#if BX_SUPPORT_VMX
+    if (BX_CPU_THIS_PTR in_vmx_guest)
+      VMexit_RDTSC(i);
+#endif
+
+    // return ticks
+    Bit64u ticks = BX_CPU_THIS_PTR get_TSC();
+
+    RAX = GET32L(ticks);
+    RDX = GET32H(ticks);
+
+    BX_DEBUG(("RDTSC: ticks 0x%08x:%08x", EDX, EAX));
+
+  } else {
     BX_ERROR(("RDTSC: not allowed to use instruction !"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_VMX
-  if (BX_CPU_THIS_PTR in_vmx_guest)
-    VMexit_RDTSC(i);
-#endif
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest)
-    if (SVM_INTERCEPT(SVM_INTERCEPT0_RDTSC)) Svm_Vmexit(SVM_VMEXIT_RDTSC);
-#endif
-
-  // return ticks
-  Bit64u ticks = BX_CPU_THIS_PTR get_TSC();
-
-  RAX = GET32L(ticks);
-  RDX = GET32H(ticks);
-
-  BX_DEBUG(("RDTSC: ticks 0x%08x:%08x", EDX, EAX));
 #endif
 
   BX_NEXT_INSTR(i);
@@ -549,28 +505,24 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::RDTSCP(bxInstruction_c *i)
   }
 #endif
 
-  if (BX_CPU_THIS_PTR cr4.get_TSD() && CPL != 0) {
+  if (! BX_CPU_THIS_PTR cr4.get_TSD() || CPL==0) {
+
+#if BX_SUPPORT_VMX
+    if (BX_CPU_THIS_PTR in_vmx_guest)
+      VMexit_RDTSC(i);
+#endif
+
+    // return ticks
+    Bit64u ticks = BX_CPU_THIS_PTR get_TSC();
+
+    RAX = GET32L(ticks);
+    RDX = GET32H(ticks);
+    RCX = MSR_TSC_AUX;
+
+  } else {
     BX_ERROR(("RDTSCP: not allowed to use instruction !"));
     exception(BX_GP_EXCEPTION, 0);
   }
-
-#if BX_SUPPORT_VMX
-  if (BX_CPU_THIS_PTR in_vmx_guest)
-    VMexit_RDTSC(i);
-#endif
-
-#if BX_SUPPORT_SVM
-  if (BX_CPU_THIS_PTR in_svm_guest)
-    if (SVM_INTERCEPT(SVM_INTERCEPT1_RDTSCP)) Svm_Vmexit(SVM_VMEXIT_RDTSCP);
-#endif
-
-  // return ticks
-  Bit64u ticks = BX_CPU_THIS_PTR get_TSC();
-
-  RAX = GET32L(ticks);
-  RDX = GET32H(ticks);
-  RCX = MSR_TSC_AUX;
-
 #endif
 
   BX_NEXT_INSTR(i);
@@ -715,7 +667,8 @@ BX_INSF_TYPE BX_CPP_AttrRegparmN(1) BX_CPU_C::MWAIT(bxInstruction_c *i)
     // When "interrupt window exiting" VMX control is set MWAIT instruction
     // won't cause the processor to enter BX_ACTIVITY_STATE_MWAIT_IF sleep
     // state with EFLAGS.IF = 0
-    if (BX_CPU_THIS_PTR vmx_interrupt_window && ! BX_CPU_THIS_PTR get_IF()) {
+    if (BX_CPU_THIS_PTR vmx_interrupt_window && ! BX_CPU_THIS_PTR get_IF())
+    {
       BX_NEXT_TRACE(i);
     }
 #endif

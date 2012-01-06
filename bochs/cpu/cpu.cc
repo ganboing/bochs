@@ -2,7 +2,7 @@
 // $Id$
 /////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (C) 2001-2012  The Bochs Project
+//  Copyright (C) 2001-2011  The Bochs Project
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -23,6 +23,8 @@
 #include "bochs.h"
 #include "cpu.h"
 #define LOG_THIS BX_CPU_THIS_PTR
+
+#include "iodev/iodev.h"
 
 #define InstrumentICACHE 0
 
@@ -57,7 +59,9 @@ void BX_CPU_C::cpu_loop(void)
 
   if (setjmp(BX_CPU_THIS_PTR jmp_buf_env)) {
     // can get here only from exception function or VMEXIT
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS
     BX_CPU_THIS_PTR icount++;
+#endif
     BX_SYNC_TIME_IF_SINGLE_PROCESSOR(0);
 #if BX_DEBUGGER || BX_GDBSTUB
     if (dbg_instruction_epilog()) return;
@@ -128,8 +132,6 @@ void BX_CPU_C::cpu_loop(void)
       BX_CPU_CALL_METHOD(i->execute, (i)); // might iterate repeat instruction
       BX_CPU_THIS_PTR prev_rip = RIP; // commit new RIP
       BX_INSTR_AFTER_EXECUTION(BX_CPU_ID, i);
-      BX_CPU_THIS_PTR icount++;
-
       BX_SYNC_TIME_IF_SINGLE_PROCESSOR(0);
 
       // note instructions generating exceptions never reach this point
@@ -266,8 +268,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat(bxInstruction_c *i, BxRepIterationP
 #endif
         break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
       BX_CPU_THIS_PTR icount++;
-
+#endif
       BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
     }
   }
@@ -287,8 +290,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat(bxInstruction_c *i, BxRepIterationP
 #endif
         break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
       BX_CPU_THIS_PTR icount++;
-
+#endif
       BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
     }
   }
@@ -307,8 +311,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat(bxInstruction_c *i, BxRepIterationP
 #endif
         break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
       BX_CPU_THIS_PTR icount++;
-
+#endif
       BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
     }
   }
@@ -353,8 +358,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -374,8 +380,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -394,8 +401,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -416,8 +424,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -437,8 +446,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -457,8 +467,9 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
 #endif
           break; // exit always if debugger enabled
 
+#if BX_SUPPORT_HANDLERS_CHAINING_SPEEDUPS || BX_SUPPORT_SMP
         BX_CPU_THIS_PTR icount++;
-
+#endif
         BX_SYNC_TIME_IF_SINGLE_PROCESSOR(BX_REPEAT_TIME_UPDATE_INTERVAL);
       }
     }
@@ -473,6 +484,270 @@ void BX_CPP_AttrRegparmN(2) BX_CPU_C::repeat_ZF(bxInstruction_c *i, BxRepIterati
   // assert magic async_event to stop trace execution
   BX_CPU_THIS_PTR async_event |= BX_ASYNC_EVENT_STOP_TRACE;
 }
+
+unsigned BX_CPU_C::handleAsyncEvent(void)
+{
+  //
+  // This area is where we process special conditions and events.
+  //
+  if (BX_CPU_THIS_PTR activity_state) {
+    // For one processor, pass the time as quickly as possible until
+    // an interrupt wakes up the CPU.
+    while (1)
+    {
+      if ((BX_CPU_INTR && (BX_CPU_THIS_PTR get_IF() || BX_CPU_THIS_PTR activity_state == BX_ACTIVITY_STATE_MWAIT_IF)) ||
+#if BX_SUPPORT_VMX >= 2
+           BX_CPU_THIS_PTR pending_vmx_timer_expired ||
+#endif
+           BX_CPU_THIS_PTR pending_NMI || BX_CPU_THIS_PTR pending_SMI || BX_CPU_THIS_PTR pending_INIT)
+      {
+        // interrupt ends the HALT condition
+#if BX_SUPPORT_MONITOR_MWAIT
+        if (BX_CPU_THIS_PTR activity_state >= BX_ACTIVITY_STATE_MWAIT)
+          BX_CPU_THIS_PTR monitor.reset_monitor();
+#endif
+        BX_CPU_THIS_PTR activity_state = 0;
+        BX_CPU_THIS_PTR inhibit_mask = 0; // clear inhibits for after resume
+        break;
+      }
+
+      if (BX_CPU_THIS_PTR activity_state == BX_ACTIVITY_STATE_ACTIVE) {
+        BX_INFO(("handleAsyncEvent: reset detected in HLT state"));
+        break;
+      }
+
+      if (BX_HRQ && BX_DBG_ASYNC_DMA) {
+        // handle DMA also when CPU is halted
+        DEV_dma_raise_hlda();
+      }
+
+      // for multiprocessor simulation, even if this CPU is halted we still
+      // must give the others a chance to simulate.  If an interrupt has
+      // arrived, then clear the HALT condition; otherwise just return from
+      // the CPU loop with stop_reason STOP_CPU_HALTED.
+#if BX_SUPPORT_SMP
+      if (BX_SMP_PROCESSORS > 1) {
+        // HALT condition remains, return so other CPUs have a chance
+#if BX_DEBUGGER
+        BX_CPU_THIS_PTR stop_reason = STOP_CPU_HALTED;
+#endif
+        return 1; // Return to caller of cpu_loop.
+      }
+#endif
+
+#if BX_DEBUGGER
+      if (bx_guard.interrupt_requested)
+        return 1; // Return to caller of cpu_loop.
+#endif
+
+      BX_TICKN(10); // when in HLT run time faster for single CPU
+    }
+  } else if (bx_pc_system.kill_bochs_request) {
+    // setting kill_bochs_request causes the cpu loop to return ASAP.
+    return 1; // Return to caller of cpu_loop.
+  }
+
+  // VMLAUNCH/VMRESUME cannot be executed with interrupts inhibited.
+  // Save inhibit interrupts state into shadow bits after clearing
+  BX_CPU_THIS_PTR inhibit_mask = (BX_CPU_THIS_PTR inhibit_mask << 2) & 0xF;
+
+  // Priority 1: Hardware Reset and Machine Checks
+  //   RESET
+  //   Machine Check
+  // (bochs doesn't support these)
+
+  // Priority 2: Trap on Task Switch
+  //   T flag in TSS is set
+  if (BX_CPU_THIS_PTR debug_trap & BX_DEBUG_TRAP_TASK_SWITCH_BIT)
+    exception(BX_DB_EXCEPTION, 0); // no error, not interrupt
+
+  // Priority 3: External Hardware Interventions
+  //   FLUSH
+  //   STOPCLK
+  //   SMI
+  //   INIT
+  if (BX_CPU_THIS_PTR pending_SMI && ! BX_CPU_THIS_PTR smm_mode())
+  {
+    // clear SMI pending flag and disable NMI when SMM was accepted
+    BX_CPU_THIS_PTR pending_SMI = 0;
+    enter_system_management_mode();
+  }
+
+  if (BX_CPU_THIS_PTR pending_INIT && ! BX_CPU_THIS_PTR disable_INIT) {
+#if BX_SUPPORT_VMX
+    if (BX_CPU_THIS_PTR in_vmx_guest) {
+      BX_ERROR(("VMEXIT: INIT pin asserted"));
+      VMexit(0, VMX_VMEXIT_INIT, 0);
+    }
+#endif
+    // reset will clear pending INIT
+    reset(BX_RESET_SOFTWARE);
+
+#if BX_SUPPORT_SMP
+    if (BX_SMP_PROCESSORS > 1) {
+      // if HALT condition remains, return so other CPUs have a chance
+      if (BX_CPU_THIS_PTR activity_state) {
+#if BX_DEBUGGER
+        BX_CPU_THIS_PTR stop_reason = STOP_CPU_HALTED;
+#endif
+        return 1; // Return to caller of cpu_loop.
+      }
+    }
+#endif
+  }
+
+  // Priority 4: Traps on Previous Instruction
+  //   Breakpoints
+  //   Debug Trap Exceptions (TF flag set or data/IO breakpoint)
+  if (! (BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_DEBUG_SHADOW)) {
+    // A trap may be inhibited on this boundary due to an instruction
+    // which loaded SS.  If so we clear the inhibit_mask below
+    // and don't execute this code until the next boundary.
+#if BX_X86_DEBUGGER
+    code_breakpoint_match(get_laddr(BX_SEG_REG_CS, BX_CPU_THIS_PTR prev_rip));
+#endif
+    if (BX_CPU_THIS_PTR debug_trap)
+      exception(BX_DB_EXCEPTION, 0); // no error, not interrupt
+  }
+  
+  // Priority 4.5: VMX Preemption Timer Expired. FIXME: is it a kind of external interrupt?
+#if BX_SUPPORT_VMX >= 2
+  if (BX_CPU_THIS_PTR in_vmx_guest) {
+    if (BX_CPU_THIS_PTR pending_vmx_timer_expired) {
+      BX_CPU_THIS_PTR pending_vmx_timer_expired = 0;
+      VMexit_PreemptionTimerExpired();
+    }
+  }
+#endif
+
+  // Priority 5: External Interrupts
+  //   NMI Interrupts
+  //   Maskable Hardware Interrupts
+  if (BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_INTERRUPTS_SHADOW) {
+    // Processing external interrupts is inhibited on this
+    // boundary because of certain instructions like STI.
+    // inhibit_mask is cleared below, in which case we will have
+    // an opportunity to check interrupts on the next instruction
+    // boundary.
+  }
+#if BX_SUPPORT_VMX
+  else if (! BX_CPU_THIS_PTR disable_NMI && BX_CPU_THIS_PTR in_vmx_guest && 
+       VMEXIT(VMX_VM_EXEC_CTRL2_NMI_WINDOW_VMEXIT))
+  {
+    // NMI-window exiting
+    BX_ERROR(("VMEXIT: NMI window exiting"));
+    VMexit(0, VMX_VMEXIT_NMI_WINDOW, 0);
+  }
+#endif
+  else if (BX_CPU_THIS_PTR pending_NMI && ! BX_CPU_THIS_PTR disable_NMI) {
+    BX_CPU_THIS_PTR pending_NMI = 0;
+    BX_CPU_THIS_PTR disable_NMI = 1;
+    BX_CPU_THIS_PTR EXT = 1; /* external event */
+#if BX_SUPPORT_VMX
+    VMexit_Event(0, BX_NMI, 2, 0, 0);
+#endif
+    BX_INSTR_HWINTERRUPT(BX_CPU_ID, 2, BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.value, RIP);
+    interrupt(2, BX_NMI, 0, 0);
+  }
+#if BX_SUPPORT_VMX
+  else if (BX_CPU_THIS_PTR vmx_interrupt_window && BX_CPU_THIS_PTR get_IF()) {
+    // interrupt-window exiting
+    BX_ERROR(("VMEXIT: interrupt window exiting"));
+    VMexit(0, VMX_VMEXIT_INTERRUPT_WINDOW, 0);
+  }
+#endif
+  else if (BX_CPU_INTR && BX_DBG_ASYNC_INTR && 
+          (BX_CPU_THIS_PTR get_IF()
+#if BX_SUPPORT_VMX
+       || (BX_CPU_THIS_PTR in_vmx_guest && PIN_VMEXIT(VMX_VM_EXEC_CTRL1_EXTERNAL_INTERRUPT_VMEXIT))
+#endif
+          ))
+  {
+    Bit8u vector;
+#if BX_SUPPORT_VMX
+    VMexit_ExtInterrupt();
+#endif
+    // NOTE: similar code in ::take_irq()
+#if BX_SUPPORT_APIC
+    if (BX_CPU_THIS_PTR lapic.INTR)
+      vector = BX_CPU_THIS_PTR lapic.acknowledge_int();
+    else
+#endif
+      // if no local APIC, always acknowledge the PIC.
+      vector = DEV_pic_iac(); // may set INTR with next interrupt
+    BX_CPU_THIS_PTR EXT = 1; /* external event */
+#if BX_SUPPORT_VMX
+    VMexit_Event(0, BX_EXTERNAL_INTERRUPT, vector, 0, 0);
+#endif
+    BX_INSTR_HWINTERRUPT(BX_CPU_ID, vector,
+        BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.value, RIP);
+    interrupt(vector, BX_EXTERNAL_INTERRUPT, 0, 0);
+    // Set up environment, as would be when this main cpu loop gets
+    // invoked.  At the end of normal instructions, we always commmit
+    // the new EIP.  But here, we call interrupt() much like
+    // it was a sofware interrupt instruction, and need to effect the
+    // commit here.  This code mirrors similar code above.
+    BX_CPU_THIS_PTR prev_rip = RIP; // commit new RIP
+    BX_CPU_THIS_PTR EXT = 0;
+  }
+  else if (BX_HRQ && BX_DBG_ASYNC_DMA) {
+    // NOTE: similar code in ::take_dma()
+    // assert Hold Acknowledge (HLDA) and go into a bus hold state
+    DEV_dma_raise_hlda();
+  }
+
+  if (BX_CPU_THIS_PTR get_TF())
+  {
+    // TF is set before execution of next instruction.  Schedule
+    // a debug trap (#DB) after execution.  After completion of
+    // next instruction, the code above will invoke the trap.
+    BX_CPU_THIS_PTR debug_trap |= BX_DEBUG_SINGLE_STEP_BIT;
+  }
+
+  // Priority 6: Faults from fetching next instruction
+  //   Code breakpoint fault
+  //   Code segment limit violation (priority 7 on 486/Pentium)
+  //   Code page fault (priority 7 on 486/Pentium)
+  // (handled in main decode loop)
+
+  // Priority 7: Faults from decoding next instruction
+  //   Instruction length > 15 bytes
+  //   Illegal opcode
+  //   Coprocessor not available
+  // (handled in main decode loop etc)
+
+  // Priority 8: Faults on executing an instruction
+  //   Floating point execution
+  //   Overflow
+  //   Bound error
+  //   Invalid TSS
+  //   Segment not present
+  //   Stack fault
+  //   General protection
+  //   Data page fault
+  //   Alignment check
+  // (handled by rest of the code)
+
+  if (!((BX_CPU_INTR && BX_CPU_THIS_PTR get_IF()) ||
+        BX_CPU_THIS_PTR debug_trap ||
+//      BX_CPU_THIS_PTR get_TF() // implies debug_trap is set
+        BX_HRQ
+#if BX_SUPPORT_VMX
+     || BX_CPU_THIS_PTR vmx_interrupt_window || BX_CPU_THIS_PTR inhibit_mask
+#endif
+#if BX_SUPPORT_VMX >= 2
+     || BX_CPU_THIS_PTR pending_vmx_timer_expired
+#endif
+#if BX_X86_DEBUGGER
+     // a debug code breakpoint is set in current page
+     || BX_CPU_THIS_PTR codebp
+#endif
+        ))
+    BX_CPU_THIS_PTR async_event = 0;
+
+  return 0; // Continue executing cpu_loop.
+}
+
 
 // boundaries of consideration:
 //
@@ -528,7 +803,7 @@ void BX_CPU_C::prefetch(void)
   if (hwbreakpoint_check(laddr, BX_HWDebugInstruction, BX_HWDebugInstruction)) {
     BX_CPU_THIS_PTR async_event = 1;
     BX_CPU_THIS_PTR codebp = 1;
-    if (! interrupts_inhibited(BX_INHIBIT_DEBUG)) {
+    if (! (BX_CPU_THIS_PTR inhibit_mask & BX_INHIBIT_DEBUG_SHADOW)) {
        // The next instruction could already hit a code breakpoint but
        // async_event won't take effect immediatelly.
        // Check if the next executing instruction hits code breakpoint
@@ -580,6 +855,46 @@ void BX_CPU_C::prefetch(void)
   }
 }
 
+void BX_CPU_C::deliver_SIPI(unsigned vector)
+{
+  if (BX_CPU_THIS_PTR activity_state == BX_ACTIVITY_STATE_WAIT_FOR_SIPI) {
+    BX_CPU_THIS_PTR activity_state = BX_ACTIVITY_STATE_ACTIVE;
+    RIP = 0;
+    load_seg_reg(&BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS], vector*0x100);
+    BX_CPU_THIS_PTR disable_INIT = 0; // enable INIT pin back
+    BX_INFO(("CPU %d started up at %04X:%08X by APIC",
+                   BX_CPU_THIS_PTR bx_cpuid, vector*0x100, EIP));
+  } else {
+    BX_INFO(("CPU %d started up by APIC, but was not halted at the time", BX_CPU_THIS_PTR bx_cpuid));
+  }
+}
+
+void BX_CPU_C::deliver_INIT(void)
+{
+  if (! BX_CPU_THIS_PTR disable_INIT) {
+    BX_CPU_THIS_PTR pending_INIT = 1;
+    BX_CPU_THIS_PTR async_event = 1;
+  }
+}
+
+void BX_CPU_C::deliver_NMI(void)
+{
+  BX_CPU_THIS_PTR pending_NMI = 1;
+  BX_CPU_THIS_PTR async_event = 1;
+}
+
+void BX_CPU_C::deliver_SMI(void)
+{
+  BX_CPU_THIS_PTR pending_SMI = 1;
+  BX_CPU_THIS_PTR async_event = 1;
+}
+
+void BX_CPU_C::set_INTR(bx_bool value)
+{
+  BX_CPU_THIS_PTR INTR = value;
+  BX_CPU_THIS_PTR async_event = 1;
+}
+
 #if BX_DEBUGGER || BX_GDBSTUB
 bx_bool BX_CPU_C::dbg_instruction_epilog(void)
 {
@@ -587,6 +902,8 @@ bx_bool BX_CPU_C::dbg_instruction_epilog(void)
   Bit64u tt = bx_pc_system.time_ticks();
   bx_address debug_eip = RIP;
   Bit16u cs = BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].selector.value;
+
+  BX_CPU_THIS_PTR icount++;
 
   BX_CPU_THIS_PTR guard_found.cs  = cs;
   BX_CPU_THIS_PTR guard_found.eip = debug_eip;
@@ -625,7 +942,7 @@ bx_bool BX_CPU_C::dbg_instruction_epilog(void)
 
   // see if debugger requesting icount guard 
   if (bx_guard.guard_for & BX_DBG_GUARD_ICOUNT) {
-    if (get_icount() >= BX_CPU_THIS_PTR guard_found.icount_max) {
+    if (BX_CPU_THIS_PTR icount >= BX_CPU_THIS_PTR guard_found.icount_max) {
       return(1);
     }
   }
@@ -701,3 +1018,44 @@ bx_bool BX_CPU_C::dbg_instruction_epilog(void)
   return(0);
 }
 #endif // BX_DEBUGGER || BX_GDBSTUB
+
+#if BX_DEBUGGER
+
+void BX_CPU_C::dbg_take_irq(void)
+{
+  // NOTE: similar code in ::cpu_loop()
+
+  if (BX_CPU_INTR && BX_CPU_THIS_PTR get_IF()) {
+    if (setjmp(BX_CPU_THIS_PTR jmp_buf_env) == 0) {
+      // normal return from setjmp setup
+      unsigned vector = DEV_pic_iac(); // may set INTR with next interrupt
+      BX_CPU_THIS_PTR EXT = 1; // external event
+      BX_CPU_THIS_PTR async_event = 1; // set in case INTR is triggered
+      interrupt(vector, BX_EXTERNAL_INTERRUPT, 0, 0);
+    }
+  }
+}
+
+void BX_CPU_C::dbg_force_interrupt(unsigned vector)
+{
+  // Used to force simulator to take an interrupt, without
+  // regard to IF
+
+  if (setjmp(BX_CPU_THIS_PTR jmp_buf_env) == 0) {
+    // normal return from setjmp setup
+    BX_CPU_THIS_PTR EXT = 1; // external event
+    BX_CPU_THIS_PTR async_event = 1; // probably don't need this
+    interrupt(vector, BX_EXTERNAL_INTERRUPT, 0, 0);
+  }
+}
+
+void BX_CPU_C::dbg_take_dma(void)
+{
+  // NOTE: similar code in ::cpu_loop()
+  if (BX_HRQ) {
+    BX_CPU_THIS_PTR async_event = 1; // set in case INTR is triggered
+    DEV_dma_raise_hlda();
+  }
+}
+
+#endif  // #if BX_DEBUGGER

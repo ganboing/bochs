@@ -35,14 +35,10 @@ bx_pit_c *thePit = NULL;
 
 int libpit_LTX_plugin_init(plugin_t *plugin, plugintype_t type, int argc, char *argv[])
 {
-  if (type == PLUGTYPE_CORE) {
-    thePit = new bx_pit_c();
-    bx_devices.pluginPitDevice = thePit;
-    BX_REGISTER_DEVICE_DEVMODEL(plugin, type, thePit, BX_PLUGIN_PIT);
-    return 0; // Success
-  } else {
-    return -1;
-  }
+  thePit = new bx_pit_c();
+  bx_devices.pluginPitDevice = thePit;
+  BX_REGISTER_DEVICE_DEVMODEL(plugin, type, thePit, BX_PLUGIN_PIT);
+  return(0); // Success
 }
 
 void libpit_LTX_plugin_fini(void)

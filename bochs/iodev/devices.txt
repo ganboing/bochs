@@ -22,7 +22,7 @@ MOTHER BOARD (i440FX Support)                                   devices.cc
   |        +---- 8254/82C54 Programmable Interval Timer         pit_wrap.cc, pit82c54.cc
   |        |             |
   |        |             +---- PC Speaker (lowlevel)            speaker.cc
-  |        |
+  |
   |        +---- 8237 DMA controller                            dma.cc
   |        +---- 82077A Floppy Drive Controller (*)             floppy.cc
   |        +---- CMOS device                                    cmos.cc
@@ -62,7 +62,6 @@ Attached devices
   |        |             |
   |        |             +---- NE2000 (ISA/PCI)                 ne2k.cc
   |        |             +---- PCI Pseudo NIC                   pcipnic.cc
-  |        |             +---- Intel 82540EM Gigabit Ethernet   e1000.cc
   |        |
   |        +---- Networking Modules                             netmod.cc
   |                      | |
